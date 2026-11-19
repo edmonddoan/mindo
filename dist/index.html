@@ -8,6 +8,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23315c48'/%3E%3Cpath d='M12 12v16m0-8h10m0 0 6-8m-6 8 6 8' stroke='%23d9ef97' stroke-width='3' fill='none'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="map-style.css">
+  <link rel="stylesheet" href="workspace.css">
 </head>
 <body>
   <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg"><defs>
@@ -55,8 +56,14 @@
     <div class="sidebar-bottom"><div class="idea-card"><div class="mini-branch"><i></i><i></i><i></i><i></i></div><strong>Big ideas start small.</strong><p>Give your thoughts a little<br>room to grow.</p><button id="inspirationBtn">Explore templates <svg class="icon"><use href="#i-spark"/></svg></button></div><button class="help-button" id="helpBtn"><svg class="icon"><use href="#i-key"/></svg>Keyboard shortcuts<span>?</span></button><div class="sidebar-footer"><span class="tiny-logo">m</span><span>Your space to think.</span><span class="version">v1.0</span></div></div>
   </aside>
   <main class="main">
-    <header class="topbar"><div class="heading"><button class="icon-button mobile-menu" id="menuBtn" aria-label="Toggle sidebar"><svg class="icon"><use href="#i-menu"/></svg></button><div><div class="breadcrumb">My workspace <span>/</span> Mind maps</div><div class="title-row"><input id="mapTitle" aria-label="Map title" value="Website redesign" maxlength="70"><button id="favoriteBtn" class="icon-button" aria-label="Add to favorites" title="Add to favorites"><svg class="icon"><use href="#i-star"/></svg></button><span class="save-status" id="saveStatus"><svg class="icon"><use href="#i-cloud"/></svg>All changes saved</span></div></div></div><div class="header-actions"><button class="icon-button" id="focusBtn" title="Focus mode" aria-label="Focus mode"><svg class="icon"><use href="#i-expand"/></svg></button><div class="export-wrap"><button class="button secondary" id="exportBtn"><svg class="icon"><use href="#i-download"/></svg><span>Export</span><svg class="icon small"><use href="#i-chevron"/></svg></button><div class="dropdown" id="exportMenu" hidden><button data-export="svg">Vector image <span>SVG</span></button><button data-export="png">Image <span>PNG</span></button><button data-export="json">Editable mind map <span>JSON</span></button></div></div><button class="button share" id="shareBtn"><svg class="icon"><use href="#i-share"/></svg>Share map</button><span class="user-avatar" title="Your personal workspace">E</span></div></header>
+    <header class="topbar"><div class="heading"><button class="icon-button mobile-menu" id="menuBtn" aria-label="Toggle sidebar"><svg class="icon"><use href="#i-menu"/></svg></button><div><div class="breadcrumb">My workspace <span>/</span> Mind maps</div><div class="title-row"><span class="workspace-title" id="workspaceTitle" hidden>My mind maps</span><input id="mapTitle" aria-label="Map title" value="Website redesign" maxlength="70"><button id="favoriteBtn" class="icon-button" aria-label="Add to favorites" title="Add to favorites"><svg class="icon"><use href="#i-star"/></svg></button><span class="save-status" id="saveStatus"><svg class="icon"><use href="#i-cloud"/></svg>All changes saved</span></div></div></div><div class="header-actions"><button class="icon-button" id="focusBtn" title="Focus mode" aria-label="Focus mode"><svg class="icon"><use href="#i-expand"/></svg></button><div class="export-wrap"><button class="button secondary" id="exportBtn"><svg class="icon"><use href="#i-download"/></svg><span>Export</span><svg class="icon small"><use href="#i-chevron"/></svg></button><div class="dropdown" id="exportMenu" hidden><button data-export="svg">Vector image <span>SVG</span></button><button data-export="png">Image <span>PNG</span></button><button data-export="json">Editable mind map <span>JSON</span></button></div></div><button class="button share" id="shareBtn"><svg class="icon"><use href="#i-share"/></svg>Share map</button><span class="user-avatar" title="Your personal workspace">E</span></div></header>
     <section class="canvas-area" id="canvasArea" aria-label="Mind map workspace">
+      <div class="workspace-empty-state" id="workspaceEmpty" hidden>
+        <span class="empty-map-icon" aria-hidden="true"><svg class="icon"><use href="#i-map"/></svg></span>
+        <h1>No mind maps yet</h1>
+        <p>Start a map to organize your ideas.</p>
+        <button class="button primary" id="emptyNewMapBtn"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>New mind map</button>
+      </div>
       <div class="canvas-top">
         <div class="view-switch"><button class="active" id="mapViewBtn"><svg class="icon"><use href="#i-map"/></svg>Mind map</button><button id="outlineViewBtn"><svg class="icon"><use href="#i-list"/></svg>Outline</button></div>
         <div class="canvas-top-right">
@@ -105,7 +112,13 @@
       <div id="outlinePanel" class="outline-panel" hidden></div>
     </section>
   </main>
-  <dialog id="appDialog"><div id="dialogContent"></div></dialog><div class="toast" id="toast" role="status"></div><input type="file" id="fileInput" accept="application/json,.json" hidden>
+  <dialog id="appDialog"><div id="dialogContent"></div></dialog>
+  <div class="toast" id="toast">
+    <span id="toastText" role="status"></span>
+    <button type="button" id="undoRemoveBtn" hidden>Undo</button>
+    <button type="button" id="dismissToastBtn" aria-label="Dismiss notification" hidden><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+  </div>
+  <input type="file" id="fileInput" accept="application/json,.json" hidden>
   <script src="layout.js"></script>
   <script src="map-style.js"></script>
   <script src="app.js"></script>

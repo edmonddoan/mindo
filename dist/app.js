@@ -62,19 +62,45 @@
   }
   const STORAGE = 'mindo.workspace.v1';
   let maps = [], currentId, selected = 'design', history = [], future = [], tool = 'select', view = {x:0,y:0,scale:1}, editing = null, panelOpen = innerWidth >= 1400, spaceHeld = false, noteSession = null, titleSession = false;
+  let removedMaps = [];
+  let loadedWorkspace = false;
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE) || 'null');
-    if (saved && Array.isArray(saved.maps)) { maps = saved.maps.map(validateMap); currentId=saved.currentId; }
+    if (Array.isArray(saved?.maps)) {
+      maps = saved.maps.map(validateMap);
+      currentId = saved.currentId;
+      loadedWorkspace = true;
+      for (const removed of Array.isArray(saved.removedMaps) ? saved.removedMaps : []) {
+        try { removedMaps.push(validateMap(removed)); }
+        catch { /* A malformed removed map must not affect active maps. */ }
+      }
+    }
   } catch { maps=[]; }
-  if(!maps.length)maps=[sampleMap()];
-  currentId = maps.some(m=>m.id===currentId) ? currentId : maps[0].id;
+  if (!loadedWorkspace) maps = [sampleMap()];
+  currentId = maps.some(m => m.id === currentId) ? currentId : maps[0]?.id ?? null;
   const map = () => maps.find(m=>m.id===currentId);
-  const root = () => map().nodes.find(n=>n.parent===null);
+  const root = () => map()?.nodes.find(n=>n.parent===null);
   const node = () => map().nodes.find(n=>n.id===selected) || root();
-  if(!map().nodes.some(n=>n.id===selected))selected=root().id;
-  function toast(message){$('toast').textContent=message;$('toast').classList.add('visible');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').classList.remove('visible'),2600);}
+  if (!map()?.nodes.some(n => n.id === selected)) selected = root()?.id ?? null;
+  function toast(message, removedMapId = null) {
+    const banner = $('toast');
+    const undoButton = $('undoRemoveBtn');
+    const dismissButton = $('dismissToastBtn');
+    const canUndo = removedMapId !== null;
+    $('toastText').textContent = message;
+    undoButton.hidden = dismissButton.hidden = !canUndo;
+    undoButton.onclick = canUndo ? () => restoreMap(removedMapId) : null;
+    dismissButton.onclick = () => {
+      banner.classList.remove('visible');
+      undoButton.hidden = dismissButton.hidden = true;
+    };
+    banner.classList.add('visible');
+    clearTimeout(toast.timer);
+    if (canUndo) undoButton.focus({ preventScroll: true });
+    else toast.timer = setTimeout(() => banner.classList.remove('visible'), 2600);
+  }
   function persist(){
-    try { localStorage.setItem(STORAGE,JSON.stringify({maps,currentId})); $('saveStatus').innerHTML=`${icon('cloud')}All changes saved`; }
+    try { localStorage.setItem(STORAGE,JSON.stringify({maps,currentId,removedMaps})); $('saveStatus').innerHTML=`${icon('cloud')}All changes saved`; }
     catch { $('saveStatus').textContent='Storage full · export to save'; if(!persist.warned){toast('Browser storage is unavailable. Export your map to keep a copy.');persist.warned=true;} }
   }
   function record(){history.push(clone(map()));if(history.length>80)history.shift();future=[];}
@@ -82,13 +108,66 @@
   function applyChange(fn){record();fn();commit();}
   function undo(){if(!history.length)return;finishEdit();future.push(clone(map()));maps[maps.findIndex(m=>m.id===currentId)]=history.pop();if(!map().nodes.some(n=>n.id===selected))selected=root().id;persist();render();ensureVisible(node());}
   function redo(){if(!future.length)return;history.push(clone(map()));maps[maps.findIndex(m=>m.id===currentId)]=future.pop();if(!map().nodes.some(n=>n.id===selected))selected=root().id;persist();render();ensureVisible(node());}
-  function switchMap(id){finishEdit();currentId=id;history=[];future=[];selected=root().id;$('sidebar').classList.remove('open');persist();render();requestAnimationFrame(()=>fit());}
-  function makeMap(kind){finishEdit();const fresh=kind==='blank'?{id:uid(),title:'Untitled mind map',favorite:false,updated:Date.now(),palette:defaultPaletteId,nodes:[{id:'root',parent:null,text:'Your big idea',x:560,y:360,color:'sage',shape:'rounded',size:18}]}:sampleMap(kind);maps.unshift(fresh);closeDialog();switchMap(fresh.id);if(kind==='blank')setTimeout(()=>startEdit(selected),120);}
+  function switchMap(id) {
+    finishEdit();
+    currentId = id;
+    history = [];
+    future = [];
+    selected = root()?.id ?? null;
+    $('sidebar').classList.remove('open');
+    persist();
+    render();
+    if (map()) requestAnimationFrame(() => fit());
+  }
+  function recentOrder(items) {
+    return [...items].sort((a, b) => b.updated - a.updated);
+  }
+  function removeMap(id, { inLibrary = false } = {}) {
+    const index = maps.findIndex(item => item.id === id);
+    if (index === -1) return;
+    finishEdit();
+    const [removed] = maps.splice(index, 1);
+    removedMaps.unshift(removed);
+    if (currentId === id) switchMap(recentOrder(maps)[0]?.id ?? null);
+    else {
+      persist();
+      renderSidebar();
+    }
+    if (!inLibrary) toast(`“${removed.title}” removed from your workspace`, removed.id);
+    return removed;
+  }
+  function restoreMap(id, { inLibrary = false } = {}) {
+    const index = removedMaps.findIndex(item => item.id === id);
+    if (index === -1) return;
+    const [restored] = removedMaps.splice(index, 1);
+    maps.unshift(restored);
+    if (!map()) switchMap(restored.id);
+    else {
+      persist();
+      renderSidebar();
+    }
+    if (!inLibrary) toast(`“${restored.title}” restored`);
+    return restored;
+  }
+  function makeMap(kind) {
+    finishEdit();
+    const fresh = kind === 'blank' ? {
+      id: uid(), title: 'Untitled mind map', favorite: false, updated: Date.now(), palette: defaultPaletteId,
+      nodes: [{ id: 'root', parent: null, text: 'Your big idea', x: 560, y: 360, color: 'sage', shape: 'rounded', size: 18 }],
+    } : sampleMap(kind);
+    maps.unshift(fresh);
+    closeDialog();
+    switchMap(fresh.id);
+    if (kind === 'blank') setTimeout(() => {
+      if (currentId === fresh.id && !$('appDialog').open) startEdit(selected);
+    }, 120);
+  }
   function dimensions(n){return {w:n.parent===null?232:map().nodes.find(p=>p.id===n.parent)?.parent===null?155:185,h:n.parent===null?68:map().nodes.find(p=>p.id===n.parent)?.parent===null?53:47};}
   function appearance(n) {
     return nodeStyle(n, map().palette, map().nodes.find(parent => parent.id === n.parent)?.parent === null);
   }
   function renderNodes(){
+    stopLayoutMotion();
     const all = map().nodes;
     $('nodes').innerHTML = all.map(n => {
       const d = dimensions(n);
@@ -114,19 +193,85 @@
     ).join('');
   }
   function connectionPath(parent, child) {
+    return curvePath(connectionPoints(parent, child, dimensions(parent).w, dimensions(child).w));
+  }
+  function connectionPoints(parent, child, parentWidth, childWidth) {
     const direction = child.x >= parent.x ? 1 : -1;
-    const start = parent.x + direction * dimensions(parent).w / 2;
-    const end = child.x - direction * dimensions(child).w / 2;
-    const middle = (start + end) / 2;
-    return `M${start},${parent.y} C${middle},${parent.y} ${middle},${child.y} ${end},${child.y}`;
+    return [parent.x + direction * parentWidth / 2, parent.y, child.x - direction * childWidth / 2, child.y];
+  }
+  function curvePath([startX, startY, endX, endY]) {
+    const middle = (startX + endX) / 2;
+    return `M${startX},${startY} C${middle},${startY} ${middle},${endY} ${endX},${endY}`;
+  }
+  let layoutMotion = null;
+  function stopLayoutMotion() {
+    if (!layoutMotion) return;
+    cancelAnimationFrame(layoutMotion.frame);
+    layoutMotion.paint(1);
+    layoutMotion = null;
+  }
+  function animateAddedIdea(previous, previousView, added) {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
+
+    // Keep the saved coordinates at their final values and animate only the rendered scene.
+    const all = map().nodes;
+    const elements = new Map([...$('nodes').children].map(el => [el.dataset.id, el]));
+    const positions = new Map(all.map(n => [n.id, {
+      el: elements.get(n.id),
+      start: previous.get(n.id),
+      end: { x: n.x, y: n.y },
+      width: dimensions(n).w,
+    }]));
+    const child = positions.get(added.id);
+    const parent = positions.get(added.parent);
+    const direction = child.end.x >= parent.end.x ? 1 : -1;
+    child.start = { x: parent.start.x + direction * (parent.width + child.width) / 2, y: parent.start.y };
+
+    const paths = $('connections').children;
+    const edges = all.filter(n => n.parent !== null).map((n, index) => {
+      const from = positions.get(n.parent);
+      const to = positions.get(n.id);
+      return {
+        el: paths[index],
+        start: connectionPoints(from.start, to.start, from.width, to.width),
+        end: connectionPoints(from.end, to.end, from.width, to.width),
+      };
+    }).filter(({ start, end }) => start.some((value, index) => value !== end[index]));
+    const moved = [...positions.values()].filter(({ start, end }) => start.x !== end.x || start.y !== end.y);
+    const cameraX = previousView.x - view.x;
+    const cameraY = previousView.y - view.y;
+    const paint = (progress) => {
+      const remaining = 1 - progress;
+      for (const { el, start, end } of moved) {
+        const dx = (start.x - end.x) * remaining;
+        const dy = (start.y - end.y) * remaining;
+        el.style.transform = dx || dy ? `translate(${dx}px,${dy}px)` : '';
+      }
+      for (const { el, start, end } of edges) {
+        el.setAttribute('d', curvePath(end.map((value, index) => value + (start[index] - value) * remaining)));
+      }
+      child.el.style.opacity = remaining ? String(progress) : '';
+      if (cameraX || cameraY) applyTransform(cameraX * remaining, cameraY * remaining);
+    };
+    const duration = 320;
+    const startTime = performance.now();
+    const tick = (time) => {
+      const elapsed = Math.max(0, Math.min(1, (time - startTime) / duration));
+      paint(1 - (1 - elapsed) ** 3);
+      if (elapsed < 1) layoutMotion.frame = requestAnimationFrame(tick);
+      else layoutMotion = null;
+    };
+    paint(0);
+    layoutMotion = { paint, frame: requestAnimationFrame(tick) };
   }
   function renderSidebar(){
-    $('recentMaps').innerHTML=[...maps].sort((a,b)=>b.updated-a.updated).slice(0,7).map(m=>`<button class="recent-map ${m.id===currentId?'active':''}" data-map="${esc(m.id)}"><span class="map-marker"></span><span>${esc(m.title)}</span>${m.favorite?icon('star'):''}</button>`).join('');
-    $('mapCount').textContent=maps.length;
-    if(document.activeElement!==$('mapTitle'))$('mapTitle').value=map().title;
-    document.title=`${map().title} — Mindo`;
-    $('favoriteBtn').classList.toggle('favorite-on',map().favorite);
-    $('favoriteBtn').setAttribute('aria-label',map().favorite?'Remove from favorites':'Add to favorites');
+    $('recentMaps').innerHTML = recentOrder(maps).slice(0, 7).map(m => `<div class="recent-map-row"><button class="recent-map ${m.id === currentId ? 'active' : ''}" data-map="${esc(m.id)}"><span class="map-marker"></span><span>${esc(m.title)}</span>${m.favorite ? icon('star') : ''}</button><button type="button" class="icon-button remove-map" data-remove-map="${esc(m.id)}" aria-label="Remove map: ${esc(m.title)}" title="Remove map">${icon('trash')}</button></div>`).join('');
+    $('mapCount').textContent = maps.length;
+    const current = map();
+    if (document.activeElement !== $('mapTitle')) $('mapTitle').value = current?.title ?? '';
+    document.title = current ? `${current.title} — Mindo` : 'My mind maps — Mindo';
+    $('favoriteBtn').classList.toggle('favorite-on', Boolean(current?.favorite));
+    $('favoriteBtn').setAttribute('aria-label', current?.favorite ? 'Remove from favorites' : 'Add to favorites');
   }
   function renderInspector(){
     const n = node();
@@ -166,10 +311,27 @@
     $('undoBtn').disabled=!history.length;$('redoBtn').disabled=!future.length;
     $('nodeCount').textContent=`${map().nodes.length} ${map().nodes.length===1?'idea':'ideas'}`;
   }
-  function render(){renderNodes();renderSidebar();renderInspector();if(!$('outlinePanel').hidden)renderOutline();}
+  function render() {
+    const current = map();
+    document.body.classList.toggle('workspace-empty', !current);
+    $('workspaceEmpty').hidden = $('workspaceTitle').hidden = Boolean(current);
+    renderSidebar();
+    if (!current) {
+      stopLayoutMotion();
+      $('nodes').replaceChildren();
+      $('connections').replaceChildren();
+      setView(false);
+      return;
+    }
+    renderNodes();
+    renderInspector();
+    if (!$('outlinePanel').hidden) renderOutline();
+  }
   function select(id){if(editing)finishEdit();selected=id;document.querySelectorAll('.node').forEach(el=>{const active=el.dataset.id===id;el.classList.toggle('selected',active);el.setAttribute('aria-pressed',String(active));});renderInspector();}
-  function applyTransform(){$('world').style.transform=`translate(${view.x}px,${view.y}px) scale(${view.scale})`;$('zoomLabel').textContent=`${Math.round(view.scale*100)}%`;}
+  function applyTransform(offsetX = 0, offsetY = 0){$('world').style.transform=`translate(${view.x + offsetX}px,${view.y + offsetY}px) scale(${view.scale})`;$('zoomLabel').textContent=`${Math.round(view.scale*100)}%`;}
   function fit(overview = false){
+    if (!map()) return;
+    stopLayoutMotion();
     const rect=$('viewport').getBoundingClientRect();const side=panelOpen&&!document.body.classList.contains('focus-mode')? (innerWidth>1200?266:245):20;
     const dims=map().nodes.map(n=>({...dimensions(n),x:n.x,y:n.y}));const minX=Math.min(...dims.map(n=>n.x-n.w/2)),maxX=Math.max(...dims.map(n=>n.x+n.w/2)),minY=Math.min(...dims.map(n=>n.y-n.h/2)),maxY=Math.max(...dims.map(n=>n.y+n.h/2));
     const left=innerWidth<=720?66:88,top=100,bottom=112,availW=Math.max(180,rect.width-left-side-24),availH=Math.max(180,rect.height-top-bottom);
@@ -177,10 +339,11 @@
     view.scale = !overview && innerWidth <= 720 ? Math.max(.45, fittedScale) : fittedScale;
     view.x=left+availW/2-(minX+maxX)/2*view.scale;view.y=top+availH/2-(minY+maxY)/2*view.scale;applyTransform();
   }
-  function zoom(factor,point){const r=$('viewport').getBoundingClientRect(),c=point||{x:r.width/2,y:r.height/2},next=Math.max(Math.min(.12,view.scale),Math.min(2.5,view.scale*factor)),ratio=next/view.scale;view.x=c.x-(c.x-view.x)*ratio;view.y=c.y-(c.y-view.y)*ratio;view.scale=next;applyTransform();}
+  function zoom(factor,point){stopLayoutMotion();const r=$('viewport').getBoundingClientRect(),c=point||{x:r.width/2,y:r.height/2},next=Math.max(Math.min(.12,view.scale),Math.min(2.5,view.scale*factor)),ratio=next/view.scale;view.x=c.x-(c.x-view.x)*ratio;view.y=c.y-(c.y-view.y)*ratio;view.scale=next;applyTransform();}
   function setTool(value){tool=value;$('selectTool').classList.toggle('active',value==='select');$('panTool').classList.toggle('active',value==='pan');$('viewport').classList.toggle('pan-mode',value==='pan'||spaceHeld);}
   function addNode(parentId=selected,sibling=false){
     finishEdit();
+    stopLayoutMotion();
     const nodes = map().nodes;
     if (nodes.length >= 500) {
       toast('This map has 500 ideas. Start a new map to keep exploring.');
@@ -191,6 +354,7 @@
       toast('The central idea has no siblings. Try adding a child.');
       return;
     }
+    if (!$('outlinePanel').hidden) setView(false);
     const parent = sibling ? nodes.find(n => n.id === original.parent) : original;
     const children = nodes.filter(n => n.parent === parent.id);
     const branchColors = colorSlots;
@@ -204,6 +368,8 @@
       shape: 'rounded',
       size: 15,
     };
+    const previous = new Map(nodes.map(({ id, x, y }) => [id, { x, y }]));
+    const previousView = { x: view.x, y: view.y };
     applyChange(() => {
       const insertAt = sibling ? nodes.indexOf(original) + 1 : nodes.length;
       nodes.splice(insertAt, 0, added);
@@ -212,6 +378,7 @@
     });
     ensureVisible(added);
     startEdit(added.id);
+    animateAddedIdea(previous, previousView, added);
   }
   function ensureVisible(n) {
     const canvas = $('viewport').getBoundingClientRect();
@@ -270,13 +437,14 @@
   }
   function startEdit(id){
     if(tool==='pan')setTool('select');finishEdit();select(id);const n=node(),el=[...document.querySelectorAll('.node')].find(e=>e.dataset.id===id);if(!el)return;
-    const input=document.createElement('input');input.value=n.text;input.maxLength=120;input.setAttribute('aria-label','Idea text');el.append(input);editing={id,input,original:n.text};input.focus();input.select();
+    const input=document.createElement('input');input.value=n.text;input.maxLength=120;input.setAttribute('aria-label','Idea text');el.append(input);editing={id,input,original:n.text};input.focus({preventScroll:true});input.select();
     input.addEventListener('pointerdown',e=>e.stopPropagation());input.addEventListener('dblclick',e=>e.stopPropagation());input.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();finishEdit();}else if(e.key==='Escape'){e.preventDefault();finishEdit(true);}else if(e.key==='Tab'){e.preventDefault();finishEdit();addNode(id);}});input.addEventListener('blur',()=>finishEdit());
   }
   function finishEdit(cancel=false){if(!editing)return;const edit=editing;editing=null;const n=map().nodes.find(n=>n.id===edit.id);const next=edit.input.value.trim()||'Untitled idea';edit.input.remove();if(n&&!cancel&&next!==edit.original){applyChange(()=>n.text=next);}else renderNodes();}
   let drag=null;
   $('viewport').addEventListener('pointerdown',e=>{
     if(e.button!==0&&e.button!==1)return;if(e.target.closest('input,.add-node'))return;
+    stopLayoutMotion();
     const el=e.target.closest('.node'),pan=tool==='pan'||spaceHeld||e.button===1||!el;
     if(editing)finishEdit();
     if(!pan){select(el.dataset.id);el.focus({preventScroll:true});}else if(!el){$('viewport').focus({preventScroll:true});}
@@ -304,8 +472,57 @@
   function templates(){dialog('A fresh place to start','Choose a starting point. Make it your own.',[
     ['blank','Your own blank canvas','One central idea. Endless possibilities.','plus'],['website','Website redesign','From your first insight to your next launch.','map'],['brainstorm','A little brainstorm','Explore, create, and connect your ideas.','spark'],['project','Product launch','Bring your next big thing into the world.','template']
     ].map(([kind,title,desc,ico])=>`<button class="template-card" data-template="${kind}"><span class="template-icon">${icon(ico)}</span><span><strong>${title}</strong><small>${desc}</small></span></button>`).join(''));}
-  $('dialogContent').addEventListener('click',e=>{const template=e.target.closest('[data-template]'),result=e.target.closest('[data-open-map]');if(template)makeMap(template.dataset.template);if(result){const id=result.dataset.openMap,idea=result.dataset.idea;closeDialog();switchMap(id);if(idea){select(idea);ensureVisible(node());}}});
-  function library(favorites=false){const items=maps.filter(m=>!favorites||m.favorite).sort((a,b)=>b.updated-a.updated);dialog(favorites?'Your favorites':'Your mind maps',favorites?'Keep your favorite ideas close.':`${maps.length} ${maps.length===1?'map':'maps'}. A world of possibilities.`,items.length?items.map(m=>`<button class="template-card" data-open-map="${esc(m.id)}"><span class="template-icon">${icon('map')}</span><span><strong>${esc(m.title)}</strong><small>${m.nodes.length} ideas · Saved on this device</small></span></button>`).join(''):'<div class="empty-state">Star a map to give it a home here.</div>');}
+  $('dialogContent').addEventListener('click', e => {
+    const target = e.target.closest('[data-template], [data-open-map], [data-remove-map], [data-restore-map], [data-new-map]');
+    if (!target) return;
+    if (target.hasAttribute('data-template')) {
+      makeMap(target.dataset.template);
+    } else if (target.hasAttribute('data-open-map')) {
+      const { openMap, idea } = target.dataset;
+      closeDialog();
+      switchMap(openMap);
+      if (idea) {
+        select(idea);
+        ensureVisible(node());
+      }
+    } else if (target.hasAttribute('data-new-map')) {
+      templates();
+    } else {
+      const favorites = target.closest('[data-library]').dataset.library === 'favorites';
+      if (target.hasAttribute('data-remove-map')) {
+        const removed = removeMap(target.dataset.removeMap, { inLibrary: true });
+        if (removed) library(favorites, { notice: `“${removed.title}” removed`, undoId: removed.id });
+      } else {
+        const restored = restoreMap(target.dataset.restoreMap, { inLibrary: true });
+        if (restored) library(favorites, { notice: `“${restored.title}” restored`, showRemoved: Boolean(target.closest('details')) });
+      }
+    }
+  });
+  function library(favorites = false, { notice = '', undoId = null, showRemoved = false } = {}) {
+    const items = recentOrder(maps.filter(item => !favorites || item.favorite));
+    const rows = items.map(item => `
+      <div class="map-library-row">
+        <button type="button" class="template-card" data-open-map="${esc(item.id)}">
+          <span class="template-icon">${icon('map')}</span>
+          <span class="map-library-label"><strong>${esc(item.title)}</strong><small>${item.nodes.length} ${item.nodes.length === 1 ? 'idea' : 'ideas'}</small></span>
+        </button>
+        <button type="button" class="icon-button remove-map" data-remove-map="${esc(item.id)}" aria-label="Remove map: ${esc(item.title)}" title="Remove map">${icon('trash')}</button>
+      </div>`).join('');
+    const empty = favorites ? '<div class="empty-state">Star a map to add it to Favorites.</div>' : `<div class="empty-state"><p>Your workspace has no mind maps.</p><button type="button" class="button primary" data-new-map>${icon('plus')}New mind map</button></div>`;
+    const feedback = notice ? `
+      <div class="map-library-notice" id="mapLibraryNotice" tabindex="-1">
+        <span role="status">${esc(notice)}</span>
+        ${undoId !== null ? `<button type="button" class="button secondary" id="libraryUndoBtn" data-restore-map="${esc(undoId)}" aria-label="Undo map removal">Undo</button>` : ''}
+      </div>` : '';
+    const removed = !favorites && removedMaps.length ? `
+      <details class="removed-maps" ${showRemoved ? 'open' : ''}>
+        <summary>Removed maps <span aria-label="${removedMaps.length} removed">${removedMaps.length}</span></summary>
+        ${removedMaps.map(item => `<div class="removed-map-row"><span>${esc(item.title)}</span><button type="button" class="button secondary" data-restore-map="${esc(item.id)}" aria-label="Restore map: ${esc(item.title)}">Restore</button></div>`).join('')}
+      </details>` : '';
+    dialog(favorites ? 'Your favorites' : 'Your mind maps', `${items.length} ${items.length === 1 ? 'map' : 'maps'}`, `
+      <div data-library="${favorites ? 'favorites' : 'maps'}">${feedback}${rows || empty}${removed}</div>`);
+    if (notice) ($('libraryUndoBtn') || $('mapLibraryNotice')).focus({ preventScroll: true });
+  }
   function search(){dialog('Find a thought','Search your maps and all the ideas inside them.','<input class="dialog-input" id="searchInput" placeholder="What are you looking for?" aria-label="Search maps and ideas"><div class="search-results" id="searchResults"></div>');const input=$('searchInput');const results=()=>{const query=input.value.trim().toLowerCase();const found=[];maps.forEach(m=>{if(!query||m.title.toLowerCase().includes(query))found.push({m});if(query)m.nodes.filter(n=>n.text.toLowerCase().includes(query)).forEach(n=>found.push({m,n}));});$('searchResults').innerHTML=found.slice(0,30).map(({m,n})=>`<button class="search-result" data-open-map="${esc(m.id)}" ${n?`data-idea="${esc(n.id)}"`:''}>${icon(n?'search':'map')}<span><strong>${esc(n?n.text:m.title)}</strong><small>${n?esc(m.title):`${m.nodes.length} ideas · Mind map`}</small></span></button>`).join('')||'<div class="empty-state">No ideas found. Try another thought.</div>';};input.addEventListener('input',results);results();setTimeout(()=>input.focus(),40);}
   function shortcuts(){dialog('A few helpful shortcuts','More flow. Fewer clicks.',[['Add a child idea','Tab'],['Add a sibling idea','Enter'],['Edit selected idea','F2'],['Delete idea & its children','Delete'],['Undo','Ctrl Z'],['Redo','Ctrl Shift Z'],['Duplicate idea','Ctrl D'],['Find maps & ideas','Ctrl K'],['Pan the canvas','Space + drag'],['Select / pan tool','V / H'],['Fit map to screen','Ctrl 0'],['Exit focus mode','Esc']].map(([label,key])=>`<div class="shortcut-row"><span>${label}</span><kbd>${key}</kbd></div>`).join(''));}
   function exportSvg(){
@@ -345,15 +562,20 @@
   async function importFile(file){try{const imported=validateMap(JSON.parse(await file.text()));imported.id=uid();imported.updated=Date.now();maps.unshift(imported);switchMap(imported.id);toast('Your mind map is ready');}catch(error){toast(error.message||'That file could not be opened. Try a Mindo JSON export.');}$('fileInput').value='';}
   $('fileInput').addEventListener('change',e=>{if(e.target.files[0])importFile(e.target.files[0]);});
   $('importBtn').onclick=()=>$('fileInput').click();
-  $('newMapBtn').onclick=templates;$('templatesBtn').onclick=templates;$('inspirationBtn').onclick=templates;$('allMapsBtn').onclick=()=>library();$('favoritesBtn').onclick=()=>library(true);
-  $('recentMaps').onclick=e=>{const target=e.target.closest('[data-map]');if(target)switchMap(target.dataset.map);};
+  $('newMapBtn').onclick=templates;$('emptyNewMapBtn').onclick=templates;$('templatesBtn').onclick=templates;$('inspirationBtn').onclick=templates;$('allMapsBtn').onclick=()=>library();$('favoritesBtn').onclick=()=>library(true);
+  $('recentMaps').onclick = e => {
+    const target = e.target.closest('[data-map], [data-remove-map]');
+    if (!target) return;
+    if (target.hasAttribute('data-remove-map')) removeMap(target.dataset.removeMap);
+    else switchMap(target.dataset.map);
+  };
   document.querySelector('.brand').onclick=e=>{e.preventDefault();library();};
   $('favoriteBtn').onclick=()=>{map().favorite=!map().favorite;persist();renderSidebar();toast(map().favorite?'Added to favorites':'Removed from favorites');};
-  $('workspaceBtn').onclick=()=>dialog('Your personal workspace','A little space, just for you.',`<p>You have <strong>${maps.length} ${maps.length===1?'mind map':'mind maps'}</strong> and <strong>${maps.reduce((sum,m)=>sum+m.nodes.length,0)} ideas</strong> in this browser.</p><p>Maps save automatically on this device. Export an editable JSON file to keep a backup or move to another browser.</p><button class="button secondary" id="workspaceExport">${icon('download')}Export current map</button>`);
+  $('workspaceBtn').onclick=()=>dialog('Your personal workspace','A little space, just for you.',`<p>You have <strong>${maps.length} ${maps.length===1?'mind map':'mind maps'}</strong> and <strong>${maps.reduce((sum,m)=>sum+m.nodes.length,0)} ideas</strong> in this browser.</p><p>Maps save automatically on this device. Export an editable JSON file to keep a backup or move to another browser.</p>${map() ? `<button class="button secondary" id="workspaceExport">${icon('download')}Export current map</button>` : ''}`);
   $('dialogContent').addEventListener('click',e=>{if(e.target.closest('#workspaceExport'))exportMap('json');});
   $('mapTitle').addEventListener('focus',()=>{titleSession=false;});
   $('mapTitle').addEventListener('input',()=>{if(!titleSession){record();titleSession=true;}map().title=$('mapTitle').value.trim()||'Untitled mind map';map().updated=Date.now();persist();renderSidebar();renderInspector();});
-  $('mapTitle').addEventListener('blur',()=>{titleSession=false;$('mapTitle').value=map().title;});
+  $('mapTitle').addEventListener('blur',()=>{titleSession=false;$('mapTitle').value=map()?.title ?? '';});
   $('searchBtn').onclick=search;$('helpBtn').onclick=shortcuts;$('shareBtn').onclick=share;
   $('exportBtn').onclick=e=>{e.stopPropagation();$('exportMenu').hidden=!$('exportMenu').hidden;};
   $('exportMenu').onclick=e=>{const target=e.target.closest('[data-export]');if(target)exportMap(target.dataset.export);};
@@ -396,12 +618,13 @@
     const mod=e.ctrlKey||e.metaKey;
     if(mod&&e.key.toLowerCase()==='k'&&!editing){e.preventDefault();search();return;}
     if(input)return;
+    if(e.key==='Escape'){document.body.classList.remove('focus-mode');$('sidebar').classList.remove('open');$('exportMenu').hidden=true;fit();return;}
+    if(!map())return;
     if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return;}
     if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();redo();return;}
     if(mod&&e.key.toLowerCase()==='d'){e.preventDefault();duplicate();return;}
     if(mod&&e.key==='0'){e.preventDefault();fit(true);return;}
     if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportMap('json');return;}
-    if(e.key==='Escape'){document.body.classList.remove('focus-mode');$('sidebar').classList.remove('open');$('exportMenu').hidden=true;fit();return;}
     if(e.target!==document.body&&!e.target.closest('.node')&&e.target!==$('viewport'))return;
     if(e.key==='Tab'){e.preventDefault();addNode();}else if(e.key==='Enter'){e.preventDefault();addNode(selected,true);}else if(e.key==='F2'){e.preventDefault();startEdit(selected);}else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteNode();}else if(e.key===' '){e.preventDefault();spaceHeld=true;setTool(tool);}else if(e.key.toLowerCase()==='h')setTool('pan');else if(e.key.toLowerCase()==='v')setTool('select');else if(e.key==='?')shortcuts();
   });

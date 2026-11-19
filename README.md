@@ -4,7 +4,9 @@ A lightweight mind map studio built with HTML, CSS, and JavaScript. Open `dist/i
 
 Maps are automatically saved in this browser's local storage. Features include editable and draggable ideas, colored branches, node shapes and text styles, notes, undo/redo, zoom and pan, outline view, templates, favorites, workspace search, JSON import/export, SVG and PNG export, and editable snapshot links.
 
-Adding or deleting an idea automatically spaces the branches around the central idea. You can still drag ideas between changes. Undo restores both the previous ideas and their positions.
+Adding or deleting an idea automatically spaces the branches around the central idea. Branches animate into place when you add an idea. Mindo respects your device's reduced motion setting. You can still drag ideas between changes, and Undo restores the previous ideas and their positions.
+
+Remove a map from the workspace via My mind maps or Recent maps. Open Removed maps to restore it, including after a reload in the same browser.
 
 Use the palette selector above the canvas to change branch colors across a map. Open the Node style panel to pick an idea's font, weight, size, and text color. These choices travel with an editable JSON export or snapshot link.
 

@@ -1,0 +1,202 @@
+.recent-map-row,
+.map-library-row,
+.removed-map-row,
+.map-library-notice {
+  display: flex;
+  align-items: center;
+}
+
+.recent-map-row {
+  gap: 2px;
+  border-radius: 6px;
+  padding-right: 2px;
+}
+
+.recent-map-row:has(.recent-map.active) {
+  background: #f7f9f4;
+}
+
+.recent-map-row .recent-map {
+  flex: 1;
+  min-width: 0;
+}
+
+.recent-map-row .remove-map {
+  width: 28px;
+  height: 30px;
+  color: #7b8778;
+}
+
+.recent-map-row .remove-map .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.remove-map:hover,
+.remove-map:focus-visible {
+  color: #9d4141;
+  background: #fdf1ef;
+}
+
+.map-library-row {
+  margin-bottom: 10px;
+  padding-right: 12px;
+  border: 1px solid #e3e9dc;
+  border-radius: 10px;
+}
+
+.map-library-row .template-card {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+  border: 0;
+}
+
+.map-library-label,
+.removed-map-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.map-library-row .remove-map {
+  margin-left: 4px;
+}
+
+.map-library-notice {
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 15px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f1f6ed;
+  color: #3b5941;
+  font-size: .85rem;
+  overflow-wrap: anywhere;
+}
+
+.removed-maps {
+  margin-top: 20px;
+  border-top: 1px solid #e3e9dc;
+  padding-top: 14px;
+  font-size: .85rem;
+  color: #536b57;
+}
+
+.removed-maps summary {
+  width: fit-content;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.removed-maps summary > span {
+  margin-left: 4px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: #f1f6ed;
+  color: #425d48;
+  font-size: .75rem;
+}
+
+.removed-map-row {
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 9px;
+  padding: 8px 0;
+  border-bottom: 1px solid #edf0e8;
+}
+
+.workspace-empty .header-actions,
+.workspace-empty #mapTitle,
+.workspace-empty #favoriteBtn,
+.workspace-empty #saveStatus,
+.workspace-empty .canvas-top,
+.workspace-empty .viewport,
+.workspace-empty .canvas-toolbar,
+.workspace-empty .inspector,
+.workspace-empty .canvas-bottom,
+.workspace-empty .keyboard-hint {
+  display: none;
+}
+
+.workspace-title {
+  color: #2c3e31;
+  font: 750 1.2rem Manrope, sans-serif;
+}
+
+.workspace-empty-state {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  min-height: 100%;
+  padding: 24px;
+  text-align: center;
+}
+
+.workspace-empty-state h1 {
+  margin: 15px 0 6px;
+  font: 750 1.65rem Manrope, sans-serif;
+  letter-spacing: -.04em;
+}
+
+.workspace-empty-state p {
+  margin: 0 0 20px;
+  color: #596f5d;
+  font-size: .95rem;
+}
+
+.empty-map-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border: 1px solid #d9e7d2;
+  border-radius: 18px;
+  color: #4f7659;
+  background: #edf4e8;
+}
+
+.empty-map-icon .icon {
+  width: 30px;
+  height: 30px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100vw - 28px);
+  overflow-wrap: anywhere;
+}
+
+.toast.visible button {
+  pointer-events: auto;
+  color: white;
+}
+
+.toast button {
+  flex-shrink: 0;
+  min-height: 28px;
+  padding: 4px 7px;
+  border-radius: 5px;
+}
+
+#undoRemoveBtn {
+  background: #ffffff25;
+  font-weight: 700;
+}
+
+#undoRemoveBtn:hover,
+#dismissToastBtn:hover {
+  background: #ffffff36;
+}
+
+#dismissToastBtn {
+  display: grid;
+  place-items: center;
+}
+
+#dismissToastBtn .icon {
+  width: 15px;
+  height: 15px;
+}
