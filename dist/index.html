@@ -7,6 +7,7 @@
   <title>Mindo — Your ideas, connected</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23315c48'/%3E%3Cpath d='M12 12v16m0-8h10m0 0 6-8m-6 8 6 8' stroke='%23d9ef97' stroke-width='3' fill='none'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="map-style.css">
 </head>
 <body>
   <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg"><defs>
@@ -56,15 +57,56 @@
   <main class="main">
     <header class="topbar"><div class="heading"><button class="icon-button mobile-menu" id="menuBtn" aria-label="Toggle sidebar"><svg class="icon"><use href="#i-menu"/></svg></button><div><div class="breadcrumb">My workspace <span>/</span> Mind maps</div><div class="title-row"><input id="mapTitle" aria-label="Map title" value="Website redesign" maxlength="70"><button id="favoriteBtn" class="icon-button" aria-label="Add to favorites" title="Add to favorites"><svg class="icon"><use href="#i-star"/></svg></button><span class="save-status" id="saveStatus"><svg class="icon"><use href="#i-cloud"/></svg>All changes saved</span></div></div></div><div class="header-actions"><button class="icon-button" id="focusBtn" title="Focus mode" aria-label="Focus mode"><svg class="icon"><use href="#i-expand"/></svg></button><div class="export-wrap"><button class="button secondary" id="exportBtn"><svg class="icon"><use href="#i-download"/></svg><span>Export</span><svg class="icon small"><use href="#i-chevron"/></svg></button><div class="dropdown" id="exportMenu" hidden><button data-export="svg">Vector image <span>SVG</span></button><button data-export="png">Image <span>PNG</span></button><button data-export="json">Editable mind map <span>JSON</span></button></div></div><button class="button share" id="shareBtn"><svg class="icon"><use href="#i-share"/></svg>Share map</button><span class="user-avatar" title="Your personal workspace">E</span></div></header>
     <section class="canvas-area" id="canvasArea" aria-label="Mind map workspace">
-      <div class="canvas-top"><div class="view-switch"><button class="active" id="mapViewBtn"><svg class="icon"><use href="#i-map"/></svg>Mind map</button><button id="outlineViewBtn"><svg class="icon"><use href="#i-list"/></svg>Outline</button></div><div class="canvas-top-right"><span class="local-badge"><span></span>Personal map</span><button class="icon-button panel-toggle" id="panelBtn" title="Toggle style panel" aria-label="Toggle style panel"><svg class="icon"><use href="#i-panel"/></svg></button></div></div>
+      <div class="canvas-top">
+        <div class="view-switch"><button class="active" id="mapViewBtn"><svg class="icon"><use href="#i-map"/></svg>Mind map</button><button id="outlineViewBtn"><svg class="icon"><use href="#i-list"/></svg>Outline</button></div>
+        <div class="canvas-top-right">
+          <div class="palette-control select-wrap">
+            <span class="palette-preview" id="palettePreview" aria-hidden="true"></span>
+            <select id="mapPalette" aria-label="Map palette" title="Map palette"></select>
+            <svg class="icon select-chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+          </div>
+          <button class="icon-button panel-toggle" id="panelBtn" title="Toggle style panel" aria-label="Toggle style panel"><svg class="icon"><use href="#i-panel"/></svg></button>
+        </div>
+      </div>
       <div id="viewport" class="viewport" tabindex="0" aria-label="Mind map canvas"><div id="world" class="world"><svg id="connections" class="connections" aria-hidden="true"></svg><div id="nodes"></div></div></div>
       <div class="canvas-toolbar"><button class="tool active" id="selectTool" title="Select · V" aria-label="Select tool"><svg class="icon"><use href="#i-cursor"/></svg></button><button class="tool" id="panTool" title="Move canvas · H" aria-label="Pan tool"><svg class="icon"><use href="#i-hand"/></svg></button><div class="tool-divider"></div><button class="tool" id="addTool" title="Add child idea · Tab" aria-label="Add child idea"><svg class="icon"><use href="#i-plus"/></svg></button><button class="tool" id="noteTool" title="Add a note" aria-label="Add a note"><svg class="icon"><use href="#i-note"/></svg></button><div class="tool-divider"></div><button class="tool" id="undoBtn" title="Undo · Ctrl Z" aria-label="Undo"><svg class="icon"><use href="#i-undo"/></svg></button><button class="tool" id="redoBtn" title="Redo · Ctrl Shift Z" aria-label="Redo"><svg class="icon"><use href="#i-redo"/></svg></button></div>
-      <aside class="inspector" id="inspector"><div class="inspector-head"><strong>Node style</strong><button class="icon-button" id="closePanelBtn" title="Close panel" aria-label="Close style panel"><svg class="icon"><use href="#i-close"/></svg></button></div><div class="inspector-body"><div class="selected-label"><span id="selectedDot"></span><span id="selectedLabel">Design</span></div><div class="field-label">Color</div><div class="color-swatches" id="colorSwatches"></div><div class="field-label shape-label">Shape</div><div class="shape-options"><button class="shape-option active" data-shape="rounded" title="Rounded"><span class="shape-demo rounded"></span></button><button class="shape-option" data-shape="square" title="Rectangle"><span class="shape-demo square"></span></button><button class="shape-option" data-shape="pill" title="Pill"><span class="shape-demo pill"></span></button></div><div class="field-label">Text</div><div class="text-options"><button class="text-size" id="textSizeBtn" title="Change text size">16 <svg class="icon small"><use href="#i-chevron"/></svg></button><button id="boldBtn" class="text-bold" title="Bold text" aria-label="Bold text">B</button><button id="italicBtn" class="text-italic" title="Italic text" aria-label="Italic text">I</button><span></span><svg class="icon"><use href="#i-list"/></svg></div><div class="panel-divider"></div><label class="field-label" for="nodeNote">Note <span>Optional</span></label><textarea id="nodeNote" placeholder="Add a little context…" rows="3" maxlength="2000"></textarea><div class="node-actions"><button id="addChildBtn"><svg class="icon"><use href="#i-plus"/></svg>Add child<span>Tab</span></button><button id="duplicateBtn"><svg class="icon"><use href="#i-copy"/></svg>Duplicate<span>Ctrl D</span></button><button id="deleteBtn"><svg class="icon"><use href="#i-trash"/></svg>Delete node<span>Del</span></button></div></div><div class="panel-tip"><svg class="icon"><use href="#i-spark"/></svg><span>A little structure.<br>A lot of possibility.</span></div></aside>
+      <aside class="inspector" id="inspector">
+        <div class="inspector-head"><strong>Node style</strong><button class="icon-button" id="closePanelBtn" title="Close panel" aria-label="Close style panel"><svg class="icon"><use href="#i-close"/></svg></button></div>
+        <div class="inspector-body">
+          <div class="selected-label"><span id="selectedDot"></span><span id="selectedLabel">Design</span></div>
+          <div class="field-label">Node color</div>
+          <div class="color-swatches" id="colorSwatches" role="group" aria-label="Node color"></div>
+          <div class="field-label">Shape</div>
+          <div class="shape-options">
+            <button class="shape-option active" data-shape="rounded" title="Rounded" aria-label="Rounded"><span class="shape-demo rounded"></span></button>
+            <button class="shape-option" data-shape="square" title="Rectangle" aria-label="Rectangle"><span class="shape-demo square"></span></button>
+            <button class="shape-option" data-shape="pill" title="Pill" aria-label="Pill"><span class="shape-demo pill"></span></button>
+          </div>
+          <div class="font-controls">
+            <label class="font-field" for="fontFamily"><span>Font family</span><span class="select-wrap"><select id="fontFamily"></select><svg class="icon select-chevron" aria-hidden="true"><use href="#i-chevron"/></svg></span></label>
+            <div class="font-row">
+              <label class="font-field" for="fontWeight"><span>Font weight</span><span class="select-wrap"><select id="fontWeight"></select><svg class="icon select-chevron" aria-hidden="true"><use href="#i-chevron"/></svg></span></label>
+              <label class="font-field" for="fontSize"><span>Font size</span><span class="select-wrap"><select id="fontSize"></select><svg class="icon select-chevron" aria-hidden="true"><use href="#i-chevron"/></svg></span></label>
+            </div>
+            <div class="text-style-row">
+              <label class="text-color-field" for="textColor"><input type="color" id="textColor" value="#18271e"><span>Text color</span></label>
+              <button type="button" id="resetTextColor" title="Use palette text color" aria-label="Use palette text color">Reset</button>
+              <button type="button" id="italicBtn" aria-pressed="false" title="Italic" aria-label="Italic">I</button>
+            </div>
+          </div>
+          <div class="panel-divider"></div>
+          <label class="field-label" for="nodeNote">Note <span>Optional</span></label>
+          <textarea id="nodeNote" placeholder="Add a little context…" rows="3" maxlength="2000"></textarea>
+          <div class="node-actions"><button id="addChildBtn"><svg class="icon"><use href="#i-plus"/></svg>Add child<span>Tab</span></button><button id="duplicateBtn"><svg class="icon"><use href="#i-copy"/></svg>Duplicate<span>Ctrl D</span></button><button id="deleteBtn"><svg class="icon"><use href="#i-trash"/></svg>Delete node<span>Del</span></button></div>
+        </div>
+      </aside>
       <div class="canvas-bottom"><div class="map-meta"><svg class="icon"><use href="#i-map"/></svg><span id="nodeCount">13 ideas</span><span class="meta-divider"></span><span>Double-click a node to edit</span></div><div class="zoom-controls"><button id="zoomOutBtn" title="Zoom out" aria-label="Zoom out"><svg class="icon"><use href="#i-minus"/></svg></button><button class="zoom-label" id="zoomLabel" title="Reset zoom">100%</button><button id="zoomInBtn" title="Zoom in" aria-label="Zoom in"><svg class="icon"><use href="#i-plus"/></svg></button><span></span><button id="fitBtn" title="Fit map to screen" aria-label="Fit map to screen"><svg class="icon"><use href="#i-fit"/></svg></button></div></div>
       <div class="keyboard-hint"><kbd>Tab</kbd> add a child <span>·</span> <kbd>Enter</kbd> add a sibling <span>·</span> <kbd>Space</kbd> + drag to pan</div>
       <div id="outlinePanel" class="outline-panel" hidden></div>
     </section>
   </main>
   <dialog id="appDialog"><div id="dialogContent"></div></dialog><div class="toast" id="toast" role="status"></div><input type="file" id="fileInput" accept="application/json,.json" hidden>
+  <script src="layout.js"></script>
+  <script src="map-style.js"></script>
   <script src="app.js"></script>
 </body></html>
