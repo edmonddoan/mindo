@@ -79,7 +79,8 @@
       <div class="canvas-toolbar"><button class="tool active" id="selectTool" title="Select · V" aria-label="Select tool"><svg class="icon"><use href="#i-cursor"/></svg></button><button class="tool" id="panTool" title="Move canvas · H" aria-label="Pan tool"><svg class="icon"><use href="#i-hand"/></svg></button><div class="tool-divider"></div><button class="tool" id="addTool" title="Add child idea · Tab" aria-label="Add child idea"><svg class="icon"><use href="#i-plus"/></svg></button><button class="tool" id="noteTool" title="Add a note" aria-label="Add a note"><svg class="icon"><use href="#i-note"/></svg></button><div class="tool-divider"></div><button class="tool" id="undoBtn" title="Undo · Ctrl Z" aria-label="Undo"><svg class="icon"><use href="#i-undo"/></svg></button><button class="tool" id="redoBtn" title="Redo · Ctrl Shift Z" aria-label="Redo"><svg class="icon"><use href="#i-redo"/></svg></button></div>
       <aside class="inspector" id="inspector">
         <div class="inspector-head"><strong>Node style</strong><button class="icon-button" id="closePanelBtn" title="Close panel" aria-label="Close style panel"><svg class="icon"><use href="#i-close"/></svg></button></div>
-        <div class="inspector-body">
+        <p class="inspector-body inspector-empty" id="nodeStyleEmpty" hidden>Select a node to edit its style or notes.</p>
+        <div class="inspector-body" id="nodeStyleFields">
           <div class="selected-label"><span id="selectedDot"></span><span id="selectedLabel">Design</span></div>
           <div class="field-label">Node color</div>
           <div class="color-swatches" id="colorSwatches" role="group" aria-label="Node color"></div>
@@ -113,6 +114,18 @@
     </section>
   </main>
   <dialog id="appDialog"><div id="dialogContent"></div></dialog>
+  <dialog id="removeMapDialog" aria-labelledby="removeMapHeading" aria-describedby="removeMapDescription">
+    <div class="dialog-head">
+      <div>
+        <h2 id="removeMapHeading">Remove this map?</h2>
+        <p id="removeMapDescription"><strong id="removeMapTitle"></strong> will move to Removed maps. You can restore it later.</p>
+      </div>
+    </div>
+    <div class="dialog-body map-removal-actions">
+      <button type="button" class="button secondary" id="cancelMapRemoval">Cancel</button>
+      <button type="button" class="button confirm-map-removal" id="confirmMapRemoval">Remove map</button>
+    </div>
+  </dialog>
   <div class="toast" id="toast">
     <span id="toastText" role="status"></span>
     <button type="button" id="undoRemoveBtn" hidden>Undo</button>

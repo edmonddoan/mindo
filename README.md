@@ -6,7 +6,9 @@ Maps are automatically saved in this browser's local storage. Features include e
 
 Adding or deleting an idea automatically spaces the branches around the central idea. Branches animate into place when you add an idea. Mindo respects your device's reduced motion setting. You can still drag ideas between changes, and Undo restores the previous ideas and their positions.
 
-Remove a map from the workspace via My mind maps or Recent maps. Open Removed maps to restore it, including after a reload in the same browser.
+Click empty space on the canvas to clear the current selection. Drag empty space to pan without changing the selection.
+
+Remove a map from the workspace via My mind maps or Recent maps and confirm the removal. Open Removed maps to restore it, including after a reload in the same browser.
 
 Use the palette selector above the canvas to change branch colors across a map. Open the Node style panel to pick an idea's font, weight, size, and text color. These choices travel with an editable JSON export or snapshot link.
 

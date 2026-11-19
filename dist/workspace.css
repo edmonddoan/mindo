@@ -38,6 +38,28 @@
   background: #fdf1ef;
 }
 
+.map-removal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+#removeMapTitle {
+  overflow-wrap: anywhere;
+}
+
+.button.confirm-map-removal {
+  color: #fff;
+  background: #a2393b;
+  border: 1px solid #a2393b;
+}
+
+.button.confirm-map-removal:hover {
+  background: #872b2d;
+  border-color: #872b2d;
+}
+
 .map-library-row {
   margin-bottom: 10px;
   padding-right: 12px;
