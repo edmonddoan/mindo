@@ -225,3 +225,15 @@
   .canvas-top-right { gap: 5px; }
   .view-switch button { padding: 0 7px; }
 }
+.selection-box {
+  position: absolute;
+  z-index: 1;
+  border: 1px solid #52794d;
+  border-radius: 3px;
+  background: #6c9a612c;
+  pointer-events: none;
+}
+
+.group-selected .node.selected .add-node {
+  display: none;
+}

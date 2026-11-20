@@ -61,7 +61,7 @@
     return { id: typeof raw.id === 'string' ? raw.id : uid(), title: raw.title.slice(0,70) || 'Untitled mind map', favorite: !!raw.favorite, updated: Number(raw.updated) || Date.now(), palette: paletteId(raw.palette), nodes };
   }
   const STORAGE = 'mindo.workspace.v1';
-  let maps = [], currentId, selected = 'design', history = [], future = [], tool = 'select', view = {x:0,y:0,scale:1}, editing = null, panelOpen = innerWidth >= 1400, spaceHeld = false, noteSession = null, titleSession = false;
+  let maps = [], currentId, selection = new Set(['design']), history = [], future = [], tool = 'select', view = {x:0,y:0,scale:1}, editing = null, panelOpen = innerWidth >= 1400, spaceHeld = false, noteSession = null, titleSession = false;
   let removedMaps = [];
   let loadedWorkspace = false;
   try {
@@ -80,8 +80,9 @@
   currentId = maps.some(m => m.id === currentId) ? currentId : maps[0]?.id ?? null;
   const map = () => maps.find(m=>m.id===currentId);
   const root = () => map()?.nodes.find(n=>n.parent===null);
-  const node = () => map()?.nodes.find(n => n.id === selected);
-  if (!map()?.nodes.some(n => n.id === selected)) selected = root()?.id ?? null;
+  const node = () => selection.size === 1 ? map()?.nodes.find(n => selection.has(n.id)) : undefined;
+  const resetSelection = (id = root()?.id) => { selection = new Set(id == null ? [] : [id]); };
+  if (!node()) resetSelection();
   function toast(message, removedMapId = null) {
     const banner = $('toast');
     const undoButton = $('undoRemoveBtn');
@@ -111,7 +112,7 @@
     finishEdit();
     future.push(clone(map()));
     maps[maps.findIndex(m => m.id === currentId)] = history.pop();
-    if (selected !== null && !node()) selected = root().id;
+    selection = new Set(map().nodes.filter(n => selection.has(n.id)).map(n => n.id));
     persist();
     render();
     if (node()) ensureVisible(node());
@@ -120,17 +121,18 @@
     if (!future.length) return;
     history.push(clone(map()));
     maps[maps.findIndex(m => m.id === currentId)] = future.pop();
-    if (selected !== null && !node()) selected = root().id;
+    selection = new Set(map().nodes.filter(n => selection.has(n.id)).map(n => n.id));
     persist();
     render();
     if (node()) ensureVisible(node());
   }
   function switchMap(id) {
     finishEdit();
+    finishGesture();
     currentId = id;
     history = [];
     future = [];
-    selected = root()?.id ?? null;
+    resetSelection();
     $('sidebar').classList.remove('open');
     persist();
     render();
@@ -176,7 +178,7 @@
     closeDialog();
     switchMap(fresh.id);
     if (kind === 'blank') setTimeout(() => {
-      if (currentId === fresh.id && !$('appDialog').open) startEdit(selected);
+      if (currentId === fresh.id && !$('appDialog').open) startEdit(fresh.nodes[0].id);
     }, 120);
   }
   function dimensions(n){return {w:n.parent===null?232:map().nodes.find(p=>p.id===n.parent)?.parent===null?155:185,h:n.parent===null?68:map().nodes.find(p=>p.id===n.parent)?.parent===null?53:47};}
@@ -194,7 +196,7 @@
       const boxStyle = `left:${n.x-d.w/2}px;top:${n.y-d.h/2}px;width:${d.w}px;height:${d.h}px`;
       const themeStyle = `--node-bg:${style.background};--node-border:${style.border};--node-ink:${style.ink};--node-accent:${style.accent}`;
       const fontStyle = `font-family:${style.family};font-size:${style.size}px;font-weight:${style.weight};font-style:${style.italic ? 'italic' : 'normal'}`;
-      return `<div class="node ${isRoot ? 'root-node' : isMain ? 'main-node' : ''} ${n.id === selected ? 'selected' : ''} shape-${n.shape}" data-id="${esc(n.id)}" role="button" tabindex="0" aria-label="${esc(n.text)}. Double-click to edit" aria-pressed="${n.id === selected}" style="${boxStyle};${themeStyle};${fontStyle}">
+      return `<div class="node ${isRoot ? 'root-node' : isMain ? 'main-node' : ''} ${selection.has(n.id) ? 'selected' : ''} shape-${n.shape}" data-id="${esc(n.id)}" role="button" tabindex="0" aria-label="${esc(n.text)}. Double-click to edit" aria-pressed="${selection.has(n.id)}" style="${boxStyle};${themeStyle};${fontStyle}">
         ${isRoot ? icon('spark','root-spark') : ''}<span class="node-text">${esc(n.text)}</span>${n.note ? icon('note','node-note') : ''}
         <button class="add-node" aria-label="Add child to ${esc(n.text)}" title="Add child idea">${icon('plus')}</button>
       </div>`;
@@ -305,10 +307,16 @@
     }
     $('nodeStyleFields').hidden = !n;
     $('nodeStyleEmpty').hidden = Boolean(n);
+    $('nodeStyleEmpty').textContent = selection.size > 1
+      ? `${selection.size} ideas selected. Drag any selected idea to move them together.`
+      : 'Select a node to edit its style or notes.';
+    $('viewport').classList.toggle('group-selected', selection.size > 1);
     $('noteTool').disabled = !n;
+    $('addTool').disabled = selection.size > 1;
     $('undoBtn').disabled = !history.length;
     $('redoBtn').disabled = !future.length;
-    $('nodeCount').textContent = `${map().nodes.length} ${map().nodes.length === 1 ? 'idea' : 'ideas'}`;
+    const count = map().nodes.length;
+    $('nodeCount').textContent = selection.size > 1 ? `${selection.size} of ${count} selected` : `${count} ${count === 1 ? 'idea' : 'ideas'}`;
     if (!n) return;
     const style = appearance(n);
     $('selectedLabel').textContent = n.text;
@@ -349,7 +357,20 @@
     renderInspector();
     if (!$('outlinePanel').hidden) renderOutline();
   }
-  function select(id){if(editing)finishEdit();selected=id;document.querySelectorAll('.node').forEach(el=>{const active=el.dataset.id===id;el.classList.toggle('selected',active);el.setAttribute('aria-pressed',String(active));});renderInspector();}
+  function updateSelection(ids) {
+    if (ids.size === selection.size && [...ids].every(id => selection.has(id))) return;
+    selection = ids;
+    for (const element of $('nodes').children) {
+      const active = selection.has(element.dataset.id);
+      element.classList.toggle('selected', active);
+      element.setAttribute('aria-pressed', String(active));
+    }
+    renderInspector();
+  }
+  function select(id) {
+    finishEdit();
+    updateSelection(new Set(id == null ? [] : [id]));
+  }
   function applyTransform(offsetX = 0, offsetY = 0){$('world').style.transform=`translate(${view.x + offsetX}px,${view.y + offsetY}px) scale(${view.scale})`;$('zoomLabel').textContent=`${Math.round(view.scale*100)}%`;}
   function fit(overview = false){
     if (!map()) return;
@@ -363,7 +384,7 @@
   }
   function zoom(factor,point){stopLayoutMotion();const r=$('viewport').getBoundingClientRect(),c=point||{x:r.width/2,y:r.height/2},next=Math.max(Math.min(.12,view.scale),Math.min(2.5,view.scale*factor)),ratio=next/view.scale;view.x=c.x-(c.x-view.x)*ratio;view.y=c.y-(c.y-view.y)*ratio;view.scale=next;applyTransform();}
   function setTool(value){tool=value;$('selectTool').classList.toggle('active',value==='select');$('panTool').classList.toggle('active',value==='pan');$('viewport').classList.toggle('pan-mode',value==='pan'||spaceHeld);}
-  function addNode(parentId=selected,sibling=false){
+  function addNode(parentId = node()?.id, sibling = false){
     finishEdit();
     stopLayoutMotion();
     const nodes = map()?.nodes;
@@ -397,7 +418,7 @@
       const insertAt = sibling ? nodes.indexOf(original) + 1 : nodes.length;
       nodes.splice(insertAt, 0, added);
       globalThis.arrangeMindMap(nodes, dimensions);
-      selected = added.id;
+      resetSelection(added.id);
     });
     ensureVisible(added);
     startEdit(added.id);
@@ -437,7 +458,7 @@
     applyChange(() => {
       map().nodes = map().nodes.filter(child => !removed.has(child.id));
       globalThis.arrangeMindMap(map().nodes, dimensions);
-      selected = n.parent;
+      resetSelection(n.parent);
     });
     ensureVisible(node());
     toast(`${removed.size === 1 ? 'Idea' : 'Branch'} deleted · Ctrl Z to undo`);
@@ -455,7 +476,7 @@
     applyChange(() => {
       nodes.splice(nodes.indexOf(n) + 1, 0, copy);
       globalThis.arrangeMindMap(nodes, dimensions);
-      selected = copy.id;
+      resetSelection(copy.id);
     });
     ensureVisible(copy);
   }
@@ -466,44 +487,118 @@
     input.addEventListener('pointerdown',e=>e.stopPropagation());input.addEventListener('dblclick',e=>e.stopPropagation());input.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();finishEdit();}else if(e.key==='Escape'){e.preventDefault();finishEdit(true);}else if(e.key==='Tab'){e.preventDefault();finishEdit();addNode(id);}});input.addEventListener('blur',()=>finishEdit());
   }
   function finishEdit(cancel=false){if(!editing)return;const edit=editing;editing=null;const n=map().nodes.find(n=>n.id===edit.id);const next=edit.input.value.trim()||'Untitled idea';edit.input.remove();if(n&&!cancel&&next!==edit.original){applyChange(()=>n.text=next);}else renderNodes();}
-  let drag=null;
-  $('viewport').addEventListener('pointerdown',e=>{
-    if (!map() || (e.button !== 0 && e.button !== 1) || e.target.closest('input,.add-node')) return;
+  const viewport = $('viewport');
+  const selectionBox = $('selectionBox');
+  let gesture = null;
+
+  viewport.addEventListener('pointerdown', event => {
+    if (gesture || !map() || ![0, 1].includes(event.button) || event.target.closest('input,.add-node')) return;
+    const clickedId = event.target.closest('.node')?.dataset.id;
+    const mode = tool === 'pan' || spaceHeld || event.button === 1 ? 'pan' : clickedId === undefined ? 'box' : 'move';
     stopLayoutMotion();
-    const el=e.target.closest('.node'),pan=tool==='pan'||spaceHeld||e.button===1||!el;
-    if(editing)finishEdit();
-    if(!pan){select(el.dataset.id);el.focus({preventScroll:true});}else if(!el){$('viewport').focus({preventScroll:true});}
-    drag={pointer:e.pointerId,startX:e.clientX,startY:e.clientY,x:pan?view.x:node().x,y:pan?view.y:node().y,pan,id:pan?null:selected,background:!el&&e.button===0,moved:false,snapshot:null};
-    if(pan)$('viewport').classList.add('panning');
+    finishEdit();
+    gesture = {
+      pointer: event.pointerId, startX: event.clientX, startY: event.clientY,
+      mode, clickedId, primary: event.button === 0, moved: false,
+      viewX: view.x, viewY: view.y, originalSelection: selection,
+    };
+    if (mode === 'move') {
+      if (!selection.has(clickedId)) select(clickedId);
+      [...$('nodes').children].find(el => el.dataset.id === clickedId)?.focus({ preventScroll: true });
+    } else {
+      viewport.focus({ preventScroll: true });
+      if (mode === 'pan') viewport.classList.add('panning');
+    }
   });
-  $('viewport').addEventListener('pointermove',e=>{
-    if(!drag||drag.pointer!==e.pointerId)return;const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;if(!drag.moved&&Math.hypot(dx,dy)<4)return;
-    if(!drag.moved){if(!drag.pan)drag.snapshot=clone(map());$('viewport').setPointerCapture(e.pointerId);}drag.moved=true;
-    if(drag.pan){view.x=drag.x+dx;view.y=drag.y+dy;applyTransform();}else{const n=map().nodes.find(n=>n.id===drag.id);n.x=drag.x+dx/view.scale;n.y=drag.y+dy/view.scale;const el=[...document.querySelectorAll('.node')].find(e=>e.dataset.id===n.id),d=dimensions(n);el.style.left=`${n.x-d.w/2}px`;el.style.top=`${n.y-d.h/2}px`;renderEdges();}
+
+  function updateSelectionBox(drag, x, y) {
+    const { bounds } = drag;
+    const endX = Math.max(bounds.left, Math.min(bounds.right, x));
+    const endY = Math.max(bounds.top, Math.min(bounds.bottom, y));
+    const left = Math.min(drag.startX, endX);
+    const top = Math.min(drag.startY, endY);
+    const right = Math.max(drag.startX, endX);
+    const bottom = Math.max(drag.startY, endY);
+    selectionBox.style.left = `${left - bounds.left}px`;
+    selectionBox.style.top = `${top - bounds.top}px`;
+    selectionBox.style.width = `${right - left}px`;
+    selectionBox.style.height = `${bottom - top}px`;
+    selectionBox.hidden = false;
+    const hits = drag.targets.filter(({ rect }) => (
+      rect.left <= right && rect.right >= left && rect.top <= bottom && rect.bottom >= top
+    ));
+    updateSelection(new Set(hits.map(({ id }) => id)));
+  }
+
+  viewport.addEventListener('pointermove', event => {
+    const drag = gesture;
+    if (!drag || drag.pointer !== event.pointerId) return;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    if (!drag.moved) {
+      if (Math.hypot(dx, dy) < 4) return;
+      drag.moved = true;
+      viewport.setPointerCapture(event.pointerId);
+      if (drag.mode === 'box') {
+        drag.bounds = viewport.getBoundingClientRect();
+        drag.targets = [...$('nodes').children].map(el => ({ id: el.dataset.id, rect: el.getBoundingClientRect() }));
+      } else if (drag.mode === 'move') {
+        const elements = new Map([...$('nodes').children].map(el => [el.dataset.id, el]));
+        drag.snapshot = clone(map());
+        drag.targets = map().nodes.filter(n => selection.has(n.id)).map(n => ({
+          node: n, element: elements.get(n.id), x: n.x, y: n.y, size: dimensions(n),
+        }));
+      }
+    }
+    if (drag.mode === 'box') {
+      updateSelectionBox(drag, event.clientX, event.clientY);
+    } else if (drag.mode === 'pan') {
+      view.x = drag.viewX + dx;
+      view.y = drag.viewY + dy;
+      applyTransform();
+    } else {
+      for (const { node: n, element, x, y, size } of drag.targets) {
+        n.x = x + dx / view.scale;
+        n.y = y + dy / view.scale;
+        element.style.left = `${n.x - size.w / 2}px`;
+        element.style.top = `${n.y - size.h / 2}px`;
+      }
+      renderEdges();
+    }
   });
-  function endDrag(e) {
-    if (!drag || e.pointerId !== drag.pointer) return;
-    const last = drag;
-    drag = null;
-    $('viewport').classList.remove('panning');
-    if ($('viewport').hasPointerCapture(e.pointerId)) $('viewport').releasePointerCapture(e.pointerId);
-    if (last.moved && !last.pan) {
-      history.push(last.snapshot);
+
+  function finishGesture(event) {
+    const drag = gesture;
+    if (!drag || (event && drag.pointer !== event.pointerId)) return;
+    const released = event?.type === 'pointerup';
+    gesture = null;
+    if (released && drag.moved && drag.mode === 'box') updateSelectionBox(drag, event.clientX, event.clientY);
+    selectionBox.hidden = true;
+    viewport.classList.remove('panning');
+    if (viewport.hasPointerCapture(drag.pointer)) viewport.releasePointerCapture(drag.pointer);
+    if (drag.moved && drag.mode === 'move') {
+      history.push(drag.snapshot);
       if (history.length > 80) history.shift();
       future = [];
       commit();
+    } else if (drag.moved && drag.mode === 'box' && !released) {
+      updateSelection(drag.originalSelection);
+    } else if (!drag.moved && released && drag.primary && viewport.contains(event.target)) {
+      if (drag.mode === 'move') select(drag.clickedId);
+      else if (drag.clickedId === undefined && !event.target.closest('.node')) select(null);
     }
-    if (e.type === 'pointerup' && last.background && !last.moved && !e.target.closest('.node')) select(null);
   }
-  $('viewport').addEventListener('pointerup',endDrag);$('viewport').addEventListener('pointercancel',endDrag);
+  window.addEventListener('pointerup', finishGesture);
+  window.addEventListener('pointercancel', finishGesture);
+  viewport.addEventListener('lostpointercapture', finishGesture);
   $('nodes').addEventListener('dblclick',e=>{const el=e.target.closest('.node');if(el&&!e.target.closest('.add-node'))startEdit(el.dataset.id);});
   $('nodes').addEventListener('click',e=>{if(e.target.closest('.add-node')){const id=e.target.closest('.node').dataset.id;select(id);addNode(id);}});
-  $('nodes').addEventListener('focusin',e=>{if(e.target.classList.contains('node'))select(e.target.dataset.id);});
-  $('viewport').addEventListener('wheel',e=>{e.preventDefault();const r=$('viewport').getBoundingClientRect();zoom(Math.exp(-e.deltaY*.0015),{x:e.clientX-r.left,y:e.clientY-r.top});},{passive:false});
+  $('nodes').addEventListener('focusin',e=>{if(!gesture&&e.target.classList.contains('node'))select(e.target.dataset.id);});
+  viewport.addEventListener('wheel',e=>{e.preventDefault();if(gesture)return;const r=viewport.getBoundingClientRect();zoom(Math.exp(-e.deltaY*.0015),{x:e.clientX-r.left,y:e.clientY-r.top});},{passive:false});
   function setPanel(value){panelOpen=value;document.body.classList.toggle('panel-hidden',!value);document.body.classList.toggle('panel-open',value);$('panelBtn').setAttribute('aria-pressed',String(value));if(!$('outlinePanel').hidden)renderOutline();}
   function renderOutline(){const all=map().nodes, colors=palettes[map().palette].colors;function tree(parent){return `<ul>${all.filter(n=>n.parent===parent).map(n=>`<li><button data-outline="${esc(n.id)}"><span class="outline-dot" style="--dot:${colors[n.color].line}"></span>${esc(n.text)}</button>${tree(n.id)}</li>`).join('')}</ul>`;}const r=root();$('outlinePanel').innerHTML=`<h2>${esc(map().title)}</h2><div class="outline-tree"><button data-outline="${esc(r.id)}"><span class="outline-dot" style="--dot:${colors[r.color].rootBg}"></span><strong>${esc(r.text)}</strong></button>${tree(r.id)}</div>`;}
   function setView(outline){$('outlinePanel').hidden=!outline;$('mapViewBtn').classList.toggle('active',!outline);$('outlineViewBtn').classList.toggle('active',outline);if(outline)renderOutline();}
-  $('outlinePanel').addEventListener('click',e=>{const target=e.target.closest('[data-outline]');if(target){select(target.dataset.outline);setView(false);ensureVisible(node());startEdit(selected);}});
+  $('outlinePanel').addEventListener('click',e=>{const target=e.target.closest('[data-outline]');if(target){const id=target.dataset.outline;select(id);setView(false);ensureVisible(node());startEdit(id);}});
   function dialog(title,sub,body){finishEdit();$('dialogContent').innerHTML=`<div class="dialog-head"><div><h2>${title}</h2>${sub?`<p>${sub}</p>`:''}</div><button class="icon-button" data-close aria-label="Close dialog">${icon('close')}</button></div><div class="dialog-body">${body}</div>`;if(!$('appDialog').open)$('appDialog').showModal();}
   function closeDialog(){$('appDialog').close();}
   $('appDialog').addEventListener('click',e=>{if(e.target.closest('[data-close]')||e.target===$('appDialog'))closeDialog();});
@@ -688,7 +783,7 @@
   $('italicBtn').onclick = () => setNodeOption('italic', !node()?.italic);
   $('textColor').onchange = e => setNodeOption('textColor', validColor(e.target.value));
   $('resetTextColor').onclick = () => setNodeOption('textColor', null);
-  $('nodeNote').addEventListener('focus',()=>{$('nodeNote').dataset.node=selected;noteSession=null;});
+  $('nodeNote').addEventListener('focus',()=>{$('nodeNote').dataset.node=node()?.id ?? '';noteSession=null;});
   $('nodeNote').addEventListener('input',()=>{const n=map().nodes.find(n=>n.id===$('nodeNote').dataset.node);if(!n)return;if(noteSession!==n.id){record();noteSession=n.id;}n.note=$('nodeNote').value;map().updated=Date.now();persist();renderNodes();renderInspector();});
   $('nodeNote').addEventListener('blur',()=>{noteSession=null;});
   $('zoomOutBtn').onclick=()=>zoom(1/1.2);$('zoomInBtn').onclick=()=>zoom(1.2);$('fitBtn').onclick=()=>fit(true);$('zoomLabel').onclick=()=>zoom(1/view.scale);
@@ -700,6 +795,10 @@
   document.addEventListener('keydown',e=>{
     const input=/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)||e.target.isContentEditable;
     if($('appDialog').open||removalDialog.open)return;
+    if (gesture) {
+      if (e.key === 'Escape') finishGesture();
+      return;
+    }
     const mod=e.ctrlKey||e.metaKey;
     if(mod&&e.key.toLowerCase()==='k'&&!editing){e.preventDefault();search();return;}
     if(input)return;
@@ -712,8 +811,8 @@
     if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportMap('json');return;}
     if(e.target!==document.body&&!e.target.closest('.node')&&e.target!==$('viewport'))return;
     if (e.key === 'Tab' && !e.shiftKey && node()) { e.preventDefault(); addNode(); }
-    else if (e.key === 'Enter' && node()) { e.preventDefault(); addNode(selected, true); }
-    else if (e.key === 'F2' && node()) { e.preventDefault(); startEdit(selected); }
+    else if (e.key === 'Enter' && node()) { e.preventDefault(); addNode(node().id, true); }
+    else if (e.key === 'F2' && node()) { e.preventDefault(); startEdit(node().id); }
     else if ((e.key === 'Delete' || e.key === 'Backspace') && node()) { e.preventDefault(); deleteNode(); }
     else if (e.key === ' ') { e.preventDefault(); spaceHeld = true; setTool(tool); }
     else if (e.key.toLowerCase() === 'h') setTool('pan');
@@ -721,10 +820,10 @@
     else if (e.key === '?') shortcuts();
   });
   document.addEventListener('keyup',e=>{if(e.key===' '){spaceHeld=false;setTool(tool);}});
-  window.addEventListener('blur',()=>{spaceHeld=false;setTool(tool);});
+  window.addEventListener('blur',()=>{finishGesture();spaceHeld=false;setTool(tool);});
   window.addEventListener('resize',()=>{clearTimeout(window.resizeTimer);window.resizeTimer=setTimeout(()=>{if(innerWidth<=980&&panelOpen){setPanel(false);}fit();},120);});
   if(location.hash.startsWith('#map=')){
-    try{const binary=atob(location.hash.slice(5));const bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));const shared=validateMap(JSON.parse(new TextDecoder().decode(bytes)));shared.id=uid();shared.title=`${shared.title} (shared)`.slice(0,70);shared.updated=Date.now();maps.unshift(shared);currentId=shared.id;selected=root().id;}
+    try{const binary=atob(location.hash.slice(5));const bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));const shared=validateMap(JSON.parse(new TextDecoder().decode(bytes)));shared.id=uid();shared.title=`${shared.title} (shared)`.slice(0,70);shared.updated=Date.now();maps.unshift(shared);currentId=shared.id;resetSelection();}
     catch{setTimeout(()=>toast('This snapshot link could not be opened.'),300);}
     // Remove the snapshot after importing so a refresh does not create a second copy.
     window.history.replaceState({},'',location.pathname+location.search);
