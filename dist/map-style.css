@@ -237,3 +237,76 @@
 .group-selected .node.selected .add-node {
   display: none;
 }
+
+.brand .brand-mark {
+  display: block;
+  flex-shrink: 0;
+  object-fit: contain;
+  background: none;
+}
+
+.canvas-heading {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.canvas-title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #2c3e31;
+  font: 750 1.25rem Manrope, var(--font);
+  letter-spacing: -.04em;
+}
+
+.title-row .canvas-action {
+  flex: none;
+  height: 31px;
+  padding: 0 8px;
+  gap: 4px;
+  color: #405346;
+}
+
+.title-row .canvas-action:hover,
+.title-row .canvas-action.favorite-on {
+  background: #edf2ea;
+  border-color: #abbba7;
+}
+
+.title-row .canvas-action.favorite-on .icon {
+  fill: #52735c;
+  stroke: #52735c;
+}
+
+.title-row .save-status { flex: none; }
+.header-actions { flex: none; }
+.palette-control { width: 152px; }
+.connection { opacity: .9; }
+
+.rename-label {
+  display: block;
+  margin-bottom: 7px;
+  font-weight: 600;
+}
+
+.rename-error { margin: 0 0 14px; }
+
+.canvas-rename-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 980px) {
+  .canvas-title { font-size: 1.125rem; }
+  .title-row .canvas-action { width: 30px; padding: 0; }
+  .title-row .canvas-action span { display: none; }
+}
+
+@media (max-width: 400px) {
+  .canvas-title { font-size: 1rem; }
+  .palette-control { width: 135px; }
+  .view-switch .icon { display: none; }
+}

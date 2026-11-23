@@ -2,8 +2,7 @@
   'use strict';
 
   const colorSlots = ['sage', 'peach', 'lavender', 'blue', 'yellow', 'rose'];
-  const defaultPaletteId = 'bright';
-  const legacyPaletteId = 'soft';
+  const defaultPaletteId = 'quiet';
   const defaultFontId = 'system';
   const fontSizes = [14, 15, 16, 18, 20];
   const fonts = {
@@ -24,52 +23,53 @@
     return `#${parts.join('')}`;
   }
 
-  function makePalette(name, entries) {
+  function makePalette(name, entries, rootShade = '#1a2831') {
     const colors = Object.fromEntries(entries.map(([label, color], index) => [colorSlots[index], {
       label,
-      bg: mix(color, '#ffffff', .73),
-      border: mix(color, '#ffffff', .42),
-      ink: mix(color, '#18271e', .69),
+      bg: mix(color, '#ffffff', .79),
+      border: mix(color, '#ffffff', .28),
+      ink: '#202b2a',
       line: color,
       chip: mix(color, '#ffffff', .13),
-      rootBg: mix(color, '#1a2831', .66),
+      rootBg: mix(color, rootShade, .66),
     }]));
     return { name, colors };
   }
 
   const palettes = {
-    bright: makePalette('Bright', [
-      ['Jade', '#19a566'], ['Tangerine', '#f36d41'], ['Orchid', '#9761ec'],
-      ['Azure', '#459bfa'], ['Marigold', '#edb310'], ['Fuchsia', '#e34c9f'],
+    quiet: makePalette('Quiet Pastels', [
+      ['Sage', '#527365'], ['Clay', '#946b58'], ['Heather', '#756888'],
+      ['Slate blue', '#55758d'], ['Olive', '#777444'], ['Dusty rose', '#906579'],
     ]),
-    ocean: makePalette('Ocean', [
-      ['Mint', '#19b28f'], ['Lagoon', '#1295a2'], ['Indigo', '#6e68da'],
-      ['Cerulean', '#3a98e2'], ['Sea glass', '#7ac231'], ['Periwinkle', '#8c8be9'],
+    mist: makePalette('Cool Mist', [
+      ['Sea glass', '#4c726d'], ['Storm gray', '#636d7b'], ['Aster', '#74708e'],
+      ['River blue', '#4b6d84'], ['Eucalyptus', '#637a6b'], ['Periwinkle', '#64749a'],
     ]),
-    sunset: makePalette('Sunset', [
-      ['Honey', '#dd9b1b'], ['Papaya', '#f5813d'], ['Mulberry', '#a652b2'],
-      ['Twilight', '#7e70dd'], ['Canary', '#e9bd20'], ['Watermelon', '#e83f72'],
+    sand: makePalette('Warm Paper', [
+      ['Linen', '#786957'], ['Terracotta', '#91624f'], ['Plum gray', '#78667c'],
+      ['Pewter', '#64737a'], ['Wheat', '#85733f'], ['Rosewood', '#8d6065'],
     ]),
-    orchard: makePalette('Orchard', [
-      ['Clover', '#58ad32'], ['Apricot', '#ea8547'], ['Blueberry', '#6f75d3'],
-      ['Eucalyptus', '#36a79d'], ['Pear', '#98b929'], ['Cherry', '#dd5472'],
+    forest: makePalette('Woodland', [
+      ['Fern', '#55704e'], ['Cedar', '#865f4f'], ['Thistle', '#75647b'],
+      ['Spruce', '#4d6e73'], ['Moss', '#6c753f'], ['Mulberry', '#825e6a'],
     ]),
-    soft: { name: 'Soft', colors: {
-      sage: { label: 'Sage', bg: '#e6eddc', border: '#cfdcbd', ink: '#526b3d', line: '#aec593', chip: '#dbe6c6', rootBg: '#315c48' },
-      peach: { label: 'Peach', bg: '#f7e6dc', border: '#ead0be', ink: '#906d54', line: '#dfb79b', chip: '#f1d7c4', rootBg: '#724d38' },
-      lavender: { label: 'Lavender', bg: '#eeebf7', border: '#dcd4ed', ink: '#75628f', line: '#b9a7d6', chip: '#ddd5ef', rootBg: '#52406d' },
-      blue: { label: 'Blue', bg: '#e4edf5', border: '#cbdcea', ink: '#5d7e99', line: '#a6c4db', chip: '#d4e3ee', rootBg: '#355a75' },
-      yellow: { label: 'Butter', bg: '#f7f0d9', border: '#eadfb4', ink: '#8c7d44', line: '#d3c38b', chip: '#eee3b9', rootBg: '#625321' },
-      rose: { label: 'Rose', bg: '#f4e4e7', border: '#e9cdd3', ink: '#956a78', line: '#d6aab5', chip: '#edcfd7', rootBg: '#6d4451' },
-    } },
+    mono: makePalette('Monochrome', [
+      ['Graphite', '#505050'], ['Ash', '#626262'], ['Slate', '#555555'],
+      ['Pewter', '#676767'], ['Stone', '#707070'], ['Charcoal', '#474747'],
+    ], '#242424'),
   };
+  const legacyPalettes = { bright: 'quiet', soft: 'quiet', ocean: 'mist', sunset: 'sand', orchard: 'forest' };
 
   function validColor(color) {
     return typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : null;
   }
 
   function paletteId(value) {
-    return typeof value === 'string' && Object.hasOwn(palettes, value) ? value : legacyPaletteId;
+    if (typeof value === 'string') {
+      if (Object.hasOwn(palettes, value)) return value;
+      if (Object.hasOwn(legacyPalettes, value)) return legacyPalettes[value];
+    }
+    return defaultPaletteId;
   }
 
   function restoreNodeStyle(node) {
