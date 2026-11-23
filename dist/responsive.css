@@ -1,0 +1,121 @@
+.node,
+.node.main-node,
+.node.root-node {
+  min-height: 0;
+  padding: 10px 14px;
+  line-height: var(--node-line-height);
+}
+
+.node .node-text {
+  min-width: 0;
+  overflow: visible;
+  white-space: normal;
+}
+
+.node-line {
+  display: block;
+  min-height: var(--node-line-height);
+  white-space: pre;
+}
+
+.node .node-note {
+  top: 3px;
+  right: 5px;
+  bottom: auto;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+
+.node.is-editing > :is(.node-text, .root-spark, .node-note, .add-node) {
+  visibility: hidden;
+}
+
+.node .node-editor {
+  position: absolute;
+  inset: 4px;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  min-height: 0;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--node-bg);
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  overflow-wrap: anywhere;
+  resize: none;
+}
+
+.node .node-editor:focus { outline: none; }
+.node.is-editing { z-index: 2; }
+#editNodeTool { display: none; }
+.sidebar { overflow: hidden auto; }
+
+@media (max-width: 720px) {
+  .topbar,
+  .focus-mode .topbar {
+    height: auto;
+    min-height: 66px;
+    gap: 6px;
+    padding: 8px 11px;
+  }
+
+  .heading { flex: 1 1 0; }
+  .canvas-heading { flex: 1; }
+  .title-row { gap: 3px; }
+  .breadcrumb { margin-bottom: 3px; white-space: nowrap; }
+  .title-row .favorite-star { width: 34px; height: 36px; }
+  .canvas-title-trigger { min-height: 36px; }
+  .header-actions :is(.share, .secondary) { min-height: 36px; }
+  .header-actions .share { width: 36px; padding: 0; }
+  .header-actions .share span { display: none; }
+
+  .canvas-top { left: 12px; right: 12px; top: 12px; }
+  .canvas-top-right { min-width: 0; }
+  .palette-control { width: clamp(111px, 34vw, 148px); }
+  .palette-control select { min-height: 36px; }
+  .panel-toggle { width: 36px; height: 36px; }
+
+  .canvas-toolbar {
+    top: auto;
+    bottom: 61px;
+    left: 12px;
+    transform: none;
+    flex-direction: row;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .canvas-toolbar .tool { width: 36px; height: 36px; }
+  .canvas-toolbar #editNodeTool { display: grid; }
+  .canvas-toolbar .tool-divider { width: 1px; height: 20px; margin: 0 3px; }
+  .canvas-bottom { left: 12px; right: 12px; bottom: 12px; }
+  .zoom-controls { height: 38px; }
+  .zoom-controls button { width: 35px; height: 34px; }
+
+  body.panel-open .inspector {
+    left: 12px;
+    right: 12px;
+    top: auto;
+    bottom: 112px;
+    width: auto;
+    max-height: min(46%, 360px);
+  }
+
+  .outline-panel,
+  .panel-hidden .outline-panel {
+    left: 12px;
+    right: 12px;
+    top: 60px;
+    bottom: 112px;
+    padding: 14px;
+  }
+}
+
+@media (max-width: 360px) {
+  .canvas-top .view-switch .icon { display: none; }
+  .canvas-top .view-switch button { padding-inline: 6px; }
+  .title-row .canvas-title { font-size: .94rem; }
+}

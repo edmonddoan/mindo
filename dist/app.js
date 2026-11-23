@@ -209,23 +209,32 @@
       if (currentId === fresh.id && !$('appDialog').open) startEdit(fresh.nodes[0].id);
     }, 120);
   }
-  function dimensions(n){return {w:n.parent===null?232:map().nodes.find(p=>p.id===n.parent)?.parent===null?155:185,h:n.parent===null?68:map().nodes.find(p=>p.id===n.parent)?.parent===null?53:47};}
-  function appearance(n) {
-    return nodeStyle(n, map().palette, map().nodes.find(parent => parent.id === n.parent)?.parent === null);
+  function nodeTier(n) {
+    if (n.parent === null) return 'root';
+    return map().nodes.find(parent => parent.id === n.parent)?.parent === null ? 'branch' : 'leaf';
+  }
+  function dimensions(n, tier = nodeTier(n), style = appearance(n, tier)) {
+    const label = editing?.id === n.id ? editing.input.value : n.text;
+    return window.measureMindoNode(n, style, tier, label);
+  }
+  function appearance(n, tier = nodeTier(n)) {
+    return nodeStyle(n, map().palette, tier === 'branch');
   }
   function renderNodes(){
     stopLayoutMotion();
     const all = map().nodes;
     $('nodes').innerHTML = all.map(n => {
-      const d = dimensions(n);
-      const isRoot = n.parent === null;
-      const isMain = all.find(parent => parent.id === n.parent)?.parent === null;
-      const style = nodeStyle(n, map().palette, isMain);
+      const tier = nodeTier(n);
+      const isRoot = tier === 'root';
+      const isMain = tier === 'branch';
+      const style = appearance(n, tier);
+      const d = dimensions(n, tier, style);
       const boxStyle = `left:${n.x-d.w/2}px;top:${n.y-d.h/2}px;width:${d.w}px;height:${d.h}px`;
-      const themeStyle = `--node-bg:${style.background};--node-border:${style.border};--node-ink:${style.ink};--node-accent:${style.accent}`;
+      const themeStyle = `--node-bg:${style.background};--node-border:${style.border};--node-ink:${style.ink};--node-accent:${style.accent};--node-line-height:${d.lineHeight}px`;
       const fontStyle = `font-family:${style.family};font-size:${style.size}px;font-weight:${style.weight};font-style:${style.italic ? 'italic' : 'normal'}`;
+      const text = d.lines.map(line => `<span class="node-line">${esc(line)}</span>`).join('');
       return `<div class="node ${isRoot ? 'root-node' : isMain ? 'main-node' : ''} ${selection.has(n.id) ? 'selected' : ''} shape-${n.shape}" data-id="${esc(n.id)}" role="button" tabindex="0" aria-label="${esc(n.text)}. Double-click to edit" aria-pressed="${selection.has(n.id)}" style="${boxStyle};${themeStyle};${fontStyle}">
-        ${isRoot ? icon('spark','root-spark') : ''}<span class="node-text">${esc(n.text)}</span>${n.note ? icon('note','node-note') : ''}
+        ${isRoot ? icon('spark','root-spark') : ''}<span class="node-text">${text}</span>${n.note ? icon('note','node-note') : ''}
         <button class="add-node" aria-label="Add child to ${esc(n.text)}" title="Add child idea">${icon('plus')}</button>
       </div>`;
     }).join('');
@@ -346,6 +355,7 @@
       : 'Select a node to edit its style or notes.';
     $('viewport').classList.toggle('group-selected', selection.size > 1);
     $('noteTool').disabled = !n;
+    $('editNodeTool').disabled = !n;
     $('addTool').disabled = selection.size > 1;
     $('undoBtn').disabled = !history.length;
     $('redoBtn').disabled = !future.length;
@@ -406,15 +416,37 @@
     updateSelection(new Set(id == null ? [] : [id]));
   }
   function applyTransform(offsetX = 0, offsetY = 0){$('world').style.transform=`translate(${view.x + offsetX}px,${view.y + offsetY}px) scale(${view.scale})`;$('zoomLabel').textContent=`${Math.round(view.scale*100)}%`;}
-  function fit(overview = false){
+  const compactLayout = window.matchMedia('(max-width: 720px)');
+
+  function availableCanvas() {
+    const canvas = $('viewport').getBoundingClientRect();
+    const inspector = $('inspector').getBoundingClientRect();
+    const compact = compactLayout.matches;
+    const left = compact ? 14 : 85;
+    const top = Math.min(compact ? 63 : 74, canvas.height / 4);
+    let right = canvas.width - 14;
+    let bottom = canvas.height - Math.min(compact ? 114 : 66, canvas.height * .35);
+    if (inspector.width) {
+      if (compact) bottom = Math.min(bottom, inspector.top - canvas.top - 8);
+      else right = Math.min(right, inspector.left - canvas.left - 12);
+    }
+    return { left, top, right: Math.max(right, left + 50), bottom: Math.max(bottom, top + 50) };
+  }
+
+  function fit(overview = false) {
     if (!map()) return;
     stopLayoutMotion();
-    const rect=$('viewport').getBoundingClientRect();const side=panelOpen&&!document.body.classList.contains('focus-mode')? (innerWidth>1200?266:245):20;
-    const dims=map().nodes.map(n=>({...dimensions(n),x:n.x,y:n.y}));const minX=Math.min(...dims.map(n=>n.x-n.w/2)),maxX=Math.max(...dims.map(n=>n.x+n.w/2)),minY=Math.min(...dims.map(n=>n.y-n.h/2)),maxY=Math.max(...dims.map(n=>n.y+n.h/2));
-    const left=innerWidth<=720?66:88,top=100,bottom=112,availW=Math.max(180,rect.width-left-side-24),availH=Math.max(180,rect.height-top-bottom);
-    const fittedScale = Math.min(1.08, availW / (maxX - minX + 30), availH / (maxY - minY + 30));
-    view.scale = !overview && innerWidth <= 720 ? Math.max(.45, fittedScale) : fittedScale;
-    view.x=left+availW/2-(minX+maxX)/2*view.scale;view.y=top+availH/2-(minY+maxY)/2*view.scale;applyTransform();
+    const { left, top, right, bottom } = availableCanvas();
+    const boxes = map().nodes.map(n => ({ ...dimensions(n), x: n.x, y: n.y }));
+    const minX = Math.min(...boxes.map(n => n.x - n.w / 2));
+    const maxX = Math.max(...boxes.map(n => n.x + n.w / 2));
+    const minY = Math.min(...boxes.map(n => n.y - n.h / 2));
+    const maxY = Math.max(...boxes.map(n => n.y + n.h / 2));
+    const fittedScale = Math.min(1.08, (right - left) / (maxX - minX + 24), (bottom - top) / (maxY - minY + 24));
+    view.scale = !overview && compactLayout.matches ? Math.max(.5, fittedScale) : fittedScale;
+    view.x = (left + right) / 2 - (minX + maxX) / 2 * view.scale;
+    view.y = (top + bottom) / 2 - (minY + maxY) / 2 * view.scale;
+    applyTransform();
   }
   function zoom(factor,point){stopLayoutMotion();const r=$('viewport').getBoundingClientRect(),c=point||{x:r.width/2,y:r.height/2},next=Math.max(Math.min(.12,view.scale),Math.min(2.5,view.scale*factor)),ratio=next/view.scale;view.x=c.x-(c.x-view.x)*ratio;view.y=c.y-(c.y-view.y)*ratio;view.scale=next;applyTransform();}
   function setTool(value){tool=value;$('selectTool').classList.toggle('active',value==='select');$('panTool').classList.toggle('active',value==='pan');$('viewport').classList.toggle('pan-mode',value==='pan'||spaceHeld);}
@@ -459,13 +491,7 @@
     animateAddedIdea(previous, previousView, added);
   }
   function ensureVisible(n) {
-    const canvas = $('viewport').getBoundingClientRect();
-    const inspector = $('inspector').getBoundingClientRect();
-    const left = innerWidth <= 720 ? 62 : 80;
-    const rightWithInspector = inspector.left - canvas.left - 12;
-    const right = inspector.width && rightWithInspector - left > 120 ? rightWithInspector : canvas.width - 16;
-    const top = 74;
-    const bottom = canvas.height - 65;
+    const { left, top, right, bottom } = availableCanvas();
     const size = dimensions(n);
     const padX = Math.min((right - left) / 2, size.w * view.scale / 2 + 10);
     const padY = Math.min((bottom - top) / 2, size.h * view.scale / 2 + 10);
@@ -474,6 +500,15 @@
     view.x += Math.min(right - padX, Math.max(left + padX, x)) - x;
     view.y += Math.min(bottom - padY, Math.max(top + padY, y)) - y;
     applyTransform();
+  }
+  function fitPhoneEditor(n, minimumZoom = 0) {
+    if (compactLayout.matches) {
+      const { left, right } = availableCanvas();
+      const maxZoom = (right - left - 12) / dimensions(n).w;
+      const scale = Math.min(maxZoom, Math.max(minimumZoom, view.scale));
+      if (scale !== view.scale) zoom(scale / view.scale, { x: n.x * view.scale + view.x, y: n.y * view.scale + view.y });
+    }
+    ensureVisible(n);
   }
   function deleteNode(){
     const n = node();
@@ -514,19 +549,91 @@
     });
     ensureVisible(copy);
   }
-  function startEdit(id){
+  function startEdit(id) {
     if (!map()?.nodes.some(n => n.id === id)) return;
-    if(tool==='pan')setTool('select');finishEdit();select(id);const n=node(),el=[...document.querySelectorAll('.node')].find(e=>e.dataset.id===id);if(!el)return;
-    const input=document.createElement('input');input.value=n.text;input.maxLength=120;input.setAttribute('aria-label','Idea text');el.append(input);editing={id,input,original:n.text};input.focus({preventScroll:true});input.select();
-    input.addEventListener('pointerdown',e=>e.stopPropagation());input.addEventListener('dblclick',e=>e.stopPropagation());input.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();finishEdit();}else if(e.key==='Escape'){e.preventDefault();finishEdit(true);}else if(e.key==='Tab'){e.preventDefault();finishEdit();addNode(id);}});input.addEventListener('blur',()=>finishEdit());
+    if (tool === 'pan') setTool('select');
+    select(id);
+    const n = node();
+    const element = [...$('nodes').children].find(el => el.dataset.id === id);
+    if (!element) return;
+
+    const input = document.createElement('textarea');
+    input.className = 'node-editor';
+    input.value = n.text;
+    input.maxLength = 120;
+    input.rows = 1;
+    input.setAttribute('aria-label', 'Idea text');
+    element.classList.add('is-editing');
+    element.append(input);
+    editing = { id, input };
+
+    function resizeEditor() {
+      stopLayoutMotion();
+      const size = dimensions(n);
+      element.style.left = `${n.x - size.w / 2}px`;
+      element.style.top = `${n.y - size.h / 2}px`;
+      element.style.width = `${size.w}px`;
+      element.style.height = `${size.h}px`;
+      input.style.paddingTop = `${Math.max(4, (size.h - size.lines.length * size.lineHeight) / 2 - 5)}px`;
+      fitPhoneEditor(n);
+      renderEdges();
+    }
+
+    input.addEventListener('input', resizeEditor);
+    input.addEventListener('pointerdown', event => event.stopPropagation());
+    input.addEventListener('dblclick', event => event.stopPropagation());
+    input.addEventListener('keydown', event => {
+      event.stopPropagation();
+      if (event.isComposing || !['Enter', 'Escape', 'Tab'].includes(event.key)) return;
+      if (event.shiftKey && (event.key === 'Enter' || event.key === 'Tab')) return;
+      event.preventDefault();
+      finishEdit(event.key === 'Escape');
+      if (event.key === 'Tab') addNode(id);
+    });
+    input.addEventListener('blur', () => finishEdit());
+    input.focus({ preventScroll: true });
+    input.select();
+    const size = dimensions(n);
+    input.style.paddingTop = `${Math.max(4, (size.h - size.lines.length * size.lineHeight) / 2 - 5)}px`;
   }
-  function finishEdit(cancel=false){if(!editing)return;const edit=editing;editing=null;const n=map().nodes.find(n=>n.id===edit.id);const next=edit.input.value.trim()||'Untitled idea';edit.input.remove();if(n&&!cancel&&next!==edit.original){applyChange(()=>n.text=next);}else renderNodes();}
+
+  function updateNodeGeometry(n, change) {
+    const before = dimensions(n);
+    applyChange(() => {
+      change();
+      const after = dimensions(n);
+      if (after.w <= before.w && after.h <= before.h) return;
+      const nodes = map().nodes;
+      const touches = (size, other, otherSize) => (
+        Math.abs(n.x - other.x) < (size.w + otherSize.w) / 2 + 6 &&
+        Math.abs(n.y - other.y) < (size.h + otherSize.h) / 2 + 6
+      );
+      const newlyOverlaps = nodes.some(other => {
+        if (other === n) return false;
+        const size = dimensions(other);
+        return touches(after, other, size) && !touches(before, other, size);
+      });
+      if (newlyOverlaps) window.arrangeMindMap(nodes, dimensions);
+    });
+    ensureVisible(n);
+  }
+
+  function finishEdit(cancel = false) {
+    if (!editing) return;
+    const { id, input } = editing;
+    editing = null;
+    const n = map()?.nodes.find(n => n.id === id);
+    const next = input.value.trim() || 'Untitled idea';
+    input.remove();
+    if (n && !cancel && next !== n.text) updateNodeGeometry(n, () => { n.text = next; });
+    else if (map()) renderNodes();
+  }
   const viewport = $('viewport');
   const selectionBox = $('selectionBox');
   let gesture = null;
 
   viewport.addEventListener('pointerdown', event => {
-    if (gesture || !map() || ![0, 1].includes(event.button) || event.target.closest('input,.add-node')) return;
+    if (gesture || !map() || ![0, 1].includes(event.button) || event.target.closest('textarea,.add-node')) return;
     const clickedId = event.target.closest('.node')?.dataset.id;
     const mode = tool === 'pan' || spaceHeld || event.button === 1 ? 'pan' : clickedId === undefined ? 'box' : 'move';
     stopLayoutMotion();
@@ -779,26 +886,20 @@
     const edges = all.filter(n => n.parent !== null).map(n =>
       `<path d="${connectionPath(byId.get(n.parent), n)}" fill="none" stroke="${colors[n.color].line}" stroke-width="2" opacity=".7"/>`
     ).join('');
-    const measure = document.createElement('canvas').getContext('2d');
     const boxes = all.map(n => {
       const style = appearance(n);
       const d = dimensions(n);
       const isRoot = n.parent === null;
       const fontStyle = style.italic ? 'italic' : 'normal';
       const radius = n.shape === 'pill' ? 30 : n.shape === 'square' ? 2 : isRoot ? 12 : 10;
-      measure.font = `${fontStyle} ${style.weight} ${style.size}px ${style.family}`;
-      const iconSpace = isRoot ? 29 : 0;
-      const labelWidth = d.w - 28 - iconSpace;
-      const characters = Array.from(n.text);
-      let label = n.text;
-      while (characters.length && measure.measureText(label).width > labelWidth) {
-        characters.pop();
-        label = `${characters.join('')}…`;
-      }
-      const labelX = n.x + iconSpace / 2;
-      const iconX = n.x - (measure.measureText(label).width + iconSpace) / 2;
+      const labelX = n.x + d.iconSpace / 2;
+      const iconX = n.x - (d.textWidth + d.iconSpace) / 2;
+      const lines = d.lines.map((line, index) => {
+        const y = n.y + (index - (d.lines.length - 1) / 2) * d.lineHeight;
+        return `<tspan x="${labelX}" y="${y}">${esc(line)}</tspan>`;
+      }).join('');
       const spark = isRoot ? `<path transform="translate(${iconX},${n.y-10.5}) scale(.875)" d="m12 3 2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6Z" fill="none" stroke="${style.accent}" stroke-width="1.65" stroke-linejoin="round"/>` : '';
-      return `<rect x="${n.x-d.w/2}" y="${n.y-d.h/2}" width="${d.w}" height="${d.h}" rx="${radius}" fill="${style.background}" stroke="${style.border}"/>${spark}<text x="${labelX}" y="${n.y}" dominant-baseline="central" text-anchor="middle" font-family="${esc(style.family)}" font-size="${style.size}" fill="${style.ink}" font-weight="${style.weight}" font-style="${fontStyle}">${esc(label)}</text>`;
+      return `<rect x="${n.x-d.w/2}" y="${n.y-d.h/2}" width="${d.w}" height="${d.h}" rx="${radius}" fill="${style.background}" stroke="${style.border}"/>${spark}<text dominant-baseline="central" text-anchor="middle" font-family="${esc(style.family)}" font-size="${style.size}" fill="${style.ink}" font-weight="${style.weight}" font-style="${fontStyle}">${lines}</text>`;
     }).join('');
     return {svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(width)}" height="${Math.ceil(height)}" viewBox="${minX} ${minY} ${width} ${height}"><title>${esc(map().title)}</title><rect x="${minX}" y="${minY}" width="${width}" height="${height}" fill="#fafbf8"/>${edges}${boxes}</svg>`,width:Math.ceil(width),height:Math.ceil(height)};
   }
@@ -834,10 +935,20 @@
   $('exportMenu').onclick=e=>{const target=e.target.closest('[data-export]');if(target)exportMap(target.dataset.export);};
   document.addEventListener('click',e=>{if(!e.target.closest('.export-wrap'))$('exportMenu').hidden=true;});
   $('selectTool').onclick=()=>setTool('select');$('panTool').onclick=()=>setTool('pan');$('addTool').onclick=()=>addNode();$('addChildBtn').onclick=()=>{if(node())addNode();};$('noteTool').onclick=()=>{if(node()){setPanel(true);$('nodeNote').focus();}};
+  $('editNodeTool').onclick = () => {
+    const item = node();
+    if (!item) return;
+    setView(false);
+    fitPhoneEditor(item, .9);
+    startEdit(item.id);
+  };
   $('undoBtn').onclick=undo;$('redoBtn').onclick=redo;$('duplicateBtn').onclick=duplicate;$('deleteBtn').onclick=deleteNode;
   function setNodeOption(field, value) {
     const n = node();
-    if (n && n[field] !== value) applyChange(() => { n[field] = value; });
+    if (!n || n[field] === value) return;
+    const change = () => { n[field] = value; };
+    if (['font', 'weight', 'size', 'italic'].includes(field)) updateNodeGeometry(n, change);
+    else applyChange(change);
   }
   $('mapPalette').innerHTML = ['Bright', 'Muted and neutral'].map(group => {
     const options = Object.entries(palettes)
@@ -866,7 +977,11 @@
   $('nodeNote').addEventListener('input',()=>{const n=map().nodes.find(n=>n.id===$('nodeNote').dataset.node);if(!n)return;if(noteSession!==n.id){record();noteSession=n.id;}n.note=$('nodeNote').value;map().updated=Date.now();persist();renderNodes();renderInspector();});
   $('nodeNote').addEventListener('blur',()=>{noteSession=null;});
   $('zoomOutBtn').onclick=()=>zoom(1/1.2);$('zoomInBtn').onclick=()=>zoom(1.2);$('fitBtn').onclick=()=>fit(true);$('zoomLabel').onclick=()=>zoom(1/view.scale);
-  $('panelBtn').onclick=()=>setPanel(!panelOpen);$('closePanelBtn').onclick=()=>setPanel(false);
+  $('panelBtn').onclick = () => {
+    setPanel(!panelOpen);
+    if (panelOpen && node()) ensureVisible(node());
+  };
+  $('closePanelBtn').onclick=()=>setPanel(false);
   $('mapViewBtn').onclick=()=>setView(false);$('outlineViewBtn').onclick=()=>setView(true);
   $('focusBtn').onclick=()=>{document.body.classList.toggle('focus-mode');requestAnimationFrame(()=>fit());};
   $('menuBtn').onclick=()=>$('sidebar').classList.toggle('open');
@@ -899,7 +1014,15 @@
   });
   document.addEventListener('keyup',e=>{if(e.key===' '){spaceHeld=false;setTool(tool);}});
   window.addEventListener('blur',()=>{finishGesture();spaceHeld=false;setTool(tool);});
-  window.addEventListener('resize',()=>{clearTimeout(window.resizeTimer);window.resizeTimer=setTimeout(()=>{if(innerWidth<=980&&panelOpen){setPanel(false);}fit();},120);});
+  compactLayout.addEventListener('change', event => { if (event.matches && panelOpen) setPanel(false); });
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (editing || gesture) return;
+      fit();
+    }, 120);
+  });
   if(location.hash.startsWith('#map=')){
     try{const binary=atob(location.hash.slice(5));const bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));const shared=validateMap(JSON.parse(new TextDecoder().decode(bytes)));shared.id=uid();shared.title=`${shared.title} (shared)`.slice(0,70);shared.updated=Date.now();maps.unshift(shared);currentId=shared.id;resetSelection();}
     catch{setTimeout(()=>toast('This snapshot link could not be opened.'),300);}
