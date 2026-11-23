@@ -62,9 +62,15 @@
           <div class="breadcrumb">My workspace <span>/</span> Mind maps</div>
           <div class="title-row">
             <span class="workspace-title" id="workspaceTitle" hidden>My mind maps</span>
-            <h1 id="mapTitle" class="canvas-title"></h1>
-            <button id="renameBtn" class="button secondary canvas-action" aria-label="Rename canvas" title="Rename canvas"><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg><span>Rename</span></button>
-            <button id="favoriteBtn" class="button secondary canvas-action" aria-label="Favorite canvas" aria-pressed="false" title="Favorite canvas"><svg class="icon" aria-hidden="true"><use href="#i-star"/></svg><span id="favoriteLabel">Favorite</span></button>
+            <button type="button" id="favoriteBtn" class="favorite-star" aria-label="Favorite canvas" aria-pressed="false">
+              <svg class="icon" aria-hidden="true"><use href="#i-star"/></svg><span class="favorite-hint" id="favoriteHint" aria-hidden="true">Add to favorites</span>
+            </button>
+            <h1 class="canvas-title" id="canvasTitle">
+              <button type="button" class="canvas-title-trigger" id="canvasTitleTrigger" title="Rename canvas">
+                <span id="mapTitle"></span><svg class="icon title-edit-mark" aria-hidden="true"><use href="#i-edit"/></svg>
+              </button>
+              <input type="text" id="canvasName" class="canvas-name-input" aria-label="Canvas name" maxlength="70" hidden>
+            </h1>
             <span class="save-status" id="saveStatus"><svg class="icon"><use href="#i-cloud"/></svg>All changes saved</span>
           </div>
         </div>

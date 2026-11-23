@@ -2,7 +2,7 @@
   'use strict';
 
   const colorSlots = ['sage', 'peach', 'lavender', 'blue', 'yellow', 'rose'];
-  const defaultPaletteId = 'quiet';
+  const defaultPaletteId = 'bright';
   const defaultFontId = 'system';
   const fontSizes = [14, 15, 16, 18, 20];
   const fonts = {
@@ -23,20 +23,32 @@
     return `#${parts.join('')}`;
   }
 
-  function makePalette(name, entries, rootShade = '#1a2831') {
+  function makePalette(name, entries, { rootShade = '#1a2831', vivid = false } = {}) {
     const colors = Object.fromEntries(entries.map(([label, color], index) => [colorSlots[index], {
       label,
-      bg: mix(color, '#ffffff', .79),
-      border: mix(color, '#ffffff', .28),
+      bg: mix(color, '#ffffff', vivid ? .54 : .79),
+      border: mix(color, '#ffffff', vivid ? .14 : .28),
       ink: '#202b2a',
       line: color,
       chip: mix(color, '#ffffff', .13),
       rootBg: mix(color, rootShade, .66),
     }]));
-    return { name, colors };
+    return { name, colors, vivid };
   }
 
   const palettes = {
+    bright: makePalette('Bright', [
+      ['Emerald', '#16a36a'], ['Tangerine', '#ef6733'], ['Orchid', '#9952e4'],
+      ['Sky blue', '#237fd7'], ['Sunflower', '#edb014'], ['Raspberry', '#d83e8f'],
+    ], { vivid: true }),
+    tropical: makePalette('Tropical', [
+      ['Lagoon', '#009f98'], ['Papaya', '#f28621'], ['Hibiscus', '#d845af'],
+      ['Ocean blue', '#168aba'], ['Lime', '#75ad17'], ['Coral', '#ea514e'],
+    ], { vivid: true }),
+    jewel: makePalette('Jewel', [
+      ['Jade', '#129477'], ['Amber', '#d77b16'], ['Amethyst', '#8146cd'],
+      ['Sapphire', '#3460cf'], ['Peridot', '#8b9d16'], ['Ruby', '#c93166'],
+    ], { vivid: true }),
     quiet: makePalette('Quiet Pastels', [
       ['Sage', '#527365'], ['Clay', '#946b58'], ['Heather', '#756888'],
       ['Slate blue', '#55758d'], ['Olive', '#777444'], ['Dusty rose', '#906579'],
@@ -56,9 +68,9 @@
     mono: makePalette('Monochrome', [
       ['Graphite', '#505050'], ['Ash', '#626262'], ['Slate', '#555555'],
       ['Pewter', '#676767'], ['Stone', '#707070'], ['Charcoal', '#474747'],
-    ], '#242424'),
+    ], { rootShade: '#242424' }),
   };
-  const legacyPalettes = { bright: 'quiet', soft: 'quiet', ocean: 'mist', sunset: 'sand', orchard: 'forest' };
+  const legacyPalettes = { soft: 'quiet', ocean: 'mist', sunset: 'sand', orchard: 'forest' };
 
   function validColor(color) {
     return typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : null;

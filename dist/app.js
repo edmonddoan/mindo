@@ -155,6 +155,7 @@
   }
   function switchMap(id) {
     finishEdit();
+    finishCanvasRename(true);
     finishGesture();
     currentId = id;
     history = [];
@@ -314,14 +315,16 @@
     $('recentMaps').innerHTML = recentOrder(maps).slice(0, 7).map(m => `<div class="recent-map-row"><button class="recent-map ${m.id === currentId ? 'active' : ''}" data-map="${esc(m.id)}"><span class="map-marker"></span><span>${esc(m.title)}</span>${m.favorite ? icon('star') : ''}</button><button type="button" class="icon-button remove-map" data-remove-map="${esc(m.id)}" aria-label="Remove map: ${esc(m.title)}" title="Remove map">${icon('trash')}</button></div>`).join('');
     $('mapCount').textContent = maps.length;
     const current = map();
-    $('mapTitle').textContent = current?.title ?? '';
-    $('mapTitle').title = current?.title ?? '';
-    document.title = current ? `${current.title} — Mindo` : 'My mind maps — Mindo';
+    renderCanvasTitle(current);
     const isFavorite = Boolean(current?.favorite);
     $('favoriteBtn').classList.toggle('favorite-on', isFavorite);
     $('favoriteBtn').setAttribute('aria-pressed', String(isFavorite));
-    $('favoriteBtn').title = isFavorite ? 'Remove canvas from favorites' : 'Favorite canvas';
-    $('favoriteLabel').textContent = isFavorite ? 'Favorited' : 'Favorite';
+    $('favoriteHint').textContent = isFavorite ? 'Remove from favorites' : 'Add to favorites';
+  }
+  function renderCanvasTitle(current) {
+    $('mapTitle').textContent = current?.title ?? '';
+    $('canvasTitleTrigger').setAttribute('aria-label', current ? `Rename canvas: ${current.title}` : 'Rename canvas');
+    document.title = current ? `${current.title} — Mindo` : 'My mind maps — Mindo';
   }
   function renderInspector(){
     const n = node();
@@ -691,31 +694,39 @@
   function renameCanvas() {
     const current = map();
     if (!current) return;
-    dialog('Rename canvas', '', `
-      <form id="renameForm">
-        <label class="rename-label" for="canvasName">Canvas name</label>
-        <input class="dialog-input" id="canvasName" maxlength="70" required value="${esc(current.title)}">
-        <p class="rename-error" id="renameError" role="alert" hidden>Enter a canvas name.</p>
-        <div class="canvas-rename-actions">
-          <button type="button" class="button secondary" data-close>Cancel</button>
-          <button type="submit" class="button primary">Save name</button>
-        </div>
-      </form>`);
+    finishEdit();
     const input = $('canvasName');
+    input.value = current.title;
+    $('canvasTitleTrigger').hidden = true;
+    input.hidden = false;
     input.focus();
     input.select();
-    input.addEventListener('input', () => { $('renameError').hidden = true; });
-    $('renameForm').addEventListener('submit', event => {
-      event.preventDefault();
-      const title = input.value.trim();
-      if (!title) {
-        $('renameError').hidden = false;
-        input.focus();
-        return;
-      }
-      closeDialog();
-      if (title !== current.title) applyChange(() => { current.title = title; });
-    });
+  }
+
+  function finishCanvasRename(save) {
+    const input = $('canvasName');
+    if (input.hidden) return;
+    input.hidden = true;
+    $('canvasTitleTrigger').hidden = false;
+    const title = input.value.trim();
+    const current = map();
+    if (!save || !current || !title || title === current.title) return;
+
+    // Keep controls mounted so clicking away from the rename field still activates the clicked control.
+    record();
+    current.title = title;
+    current.updated = Date.now();
+    persist();
+    renderCanvasTitle(current);
+    const row = $('recentMaps').querySelector('.recent-map.active')?.parentElement;
+    if (row) {
+      row.querySelector('.recent-map span:nth-child(2)').textContent = title;
+      row.querySelector('[data-remove-map]').setAttribute('aria-label', `Remove map: ${title}`);
+    }
+    const outlineTitle = $('outlinePanel').querySelector('h2');
+    if (outlineTitle) outlineTitle.textContent = title;
+    $('undoBtn').disabled = false;
+    $('redoBtn').disabled = true;
   }
   $('dialogContent').addEventListener('click', e => {
     const target = e.target.closest('[data-template], [data-open-map], [data-remove-map], [data-restore-map], [data-new-map]');
@@ -809,7 +820,16 @@
   $('favoriteBtn').onclick=()=>{map().favorite=!map().favorite;persist();renderSidebar();toast(map().favorite?'Added to favorites':'Removed from favorites');};
   $('workspaceBtn').onclick=()=>dialog('Your personal workspace','A little space, just for you.',`<p>You have <strong>${maps.length} ${maps.length===1?'mind map':'mind maps'}</strong> and <strong>${maps.reduce((sum,m)=>sum+m.nodes.length,0)} ideas</strong> in this browser.</p><p>Maps save automatically on this device. Export an editable JSON file to keep a backup or move to another browser.</p>${map() ? `<button class="button secondary" id="workspaceExport">${icon('download')}Export current map</button>` : ''}`);
   $('dialogContent').addEventListener('click',e=>{if(e.target.closest('#workspaceExport'))exportMap('json');});
-  $('renameBtn').onclick=renameCanvas;$('helpBtn').onclick=shortcuts;$('shareBtn').onclick=share;
+  $('canvasTitleTrigger').onclick = renameCanvas;
+  $('canvasName').addEventListener('blur', () => finishCanvasRename(true));
+  $('canvasName').addEventListener('keydown', event => {
+    if (event.isComposing || (event.key !== 'Enter' && event.key !== 'Escape')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    finishCanvasRename(event.key === 'Enter');
+    $('canvasTitleTrigger').focus({ preventScroll: true });
+  });
+  $('helpBtn').onclick=shortcuts;$('shareBtn').onclick=share;
   $('exportBtn').onclick=e=>{e.stopPropagation();$('exportMenu').hidden=!$('exportMenu').hidden;};
   $('exportMenu').onclick=e=>{const target=e.target.closest('[data-export]');if(target)exportMap(target.dataset.export);};
   document.addEventListener('click',e=>{if(!e.target.closest('.export-wrap'))$('exportMenu').hidden=true;});
@@ -819,7 +839,12 @@
     const n = node();
     if (n && n[field] !== value) applyChange(() => { n[field] = value; });
   }
-  $('mapPalette').innerHTML = Object.entries(palettes).map(([id, theme]) => `<option value="${id}">${theme.name}</option>`).join('');
+  $('mapPalette').innerHTML = ['Bright', 'Muted and neutral'].map(group => {
+    const options = Object.entries(palettes)
+      .filter(([, theme]) => theme.vivid === (group === 'Bright'))
+      .map(([id, theme]) => `<option value="${id}">${theme.name}</option>`).join('');
+    return `<optgroup label="${group}">${options}</optgroup>`;
+  }).join('');
   $('mapPalette').onchange = e => applyChange(() => { map().palette = e.target.value; });
   $('colorSwatches').onclick = e => {
     const target = e.target.closest('[data-color]');
@@ -882,5 +907,5 @@
     window.history.replaceState({},'',location.pathname+location.search);
   }
   setPanel(panelOpen);render();persist();requestAnimationFrame(()=>fit());
-  window.addEventListener('beforeunload',()=>{if(editing)finishEdit();persist();});
+  window.addEventListener('beforeunload',()=>{if(editing)finishEdit();finishCanvasRename(true);persist();});
 })();

@@ -4,7 +4,7 @@ A lightweight mind map studio built with HTML, CSS, and JavaScript. Open `dist/i
 
 Maps are automatically saved in this browser's local storage. Features include editable and draggable ideas, colored branches, node styles, notes, undo/redo, zoom and pan, outline view, study templates, favorites, JSON import/export, SVG and PNG export, and editable snapshot links.
 
-Use **Rename** and **Favorite** beside the canvas title. **Study templates** includes Active Recall, Explain It Simply, Spaced Review, Study Session, and a blank canvas.
+Hover over the canvas title to reveal the edit icon, then click the title to rename it. Press Enter to save or Escape to cancel. Click the star to add or remove the canvas from Favorites. **Study templates** includes Active Recall, Explain It Simply, Spaced Review, Study Session, and a blank canvas.
 
 Adding or deleting an idea automatically spaces the branches around the central idea. Branches animate into place when you add an idea. Mindo respects your device's reduced motion setting. You can still drag ideas between changes, and Undo restores the previous ideas and their positions.
 
@@ -12,7 +12,7 @@ With the Select tool, drag a box from empty canvas to select every node it touch
 
 Remove a map from the workspace via My mind maps or Recent maps and confirm the removal. Open Removed maps to restore it, including after a reload in the same browser.
 
-Use the palette selector above the canvas to choose muted colors or Monochrome. Existing palettes are mapped to the closest new option. Open the Node style panel to pick an idea's font, weight, size, and text color. These choices travel with an editable JSON export or snapshot link.
+Use the palette selector above the canvas to choose brighter, muted, or monochrome colors. New canvases use Bright by default. Open the Node style panel to pick an idea's font, weight, size, and text color. These choices travel with an editable JSON export or snapshot link.
 
 Snapshot links contain a complete copy of the current map, including notes. They require the recipient to have access to the app. This app does not provide real-time collaboration or cross-device synchronization.
 
