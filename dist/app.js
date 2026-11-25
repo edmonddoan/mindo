@@ -26,7 +26,7 @@
         ...restoreNodeStyle(n),
       };
     });
-    if (nodes.filter(n=>n.parent===null).length !== 1) throw new Error('A mind map needs one central idea.');
+    if (!nodes.some(n => n.parent === null)) throw new Error('A canvas needs at least one central idea.');
     const lookup = new Map(nodes.map(n=>[n.id,n]));
     nodes.forEach(n=>{
       const seen = new Set([n.id]); let p=n.parent;
@@ -143,13 +143,61 @@
   function makeMap() {
     finishEdit();
     const fresh = {
-      id: uid(), title: 'Untitled mind map', favorite: false, updated: Date.now(), palette: defaultPaletteId,
+      id: uid(), title: 'Untitled canvas', favorite: false, updated: Date.now(), palette: defaultPaletteId,
       nodes: [{ id: 'root', parent: null, text: 'Your big idea', x: 560, y: 360, color: 'sage', shape: 'rounded', size: 18 }],
     };
     maps.unshift(fresh);
     closeDialog();
     switchMap(fresh.id);
     startEdit(fresh.nodes[0].id);
+  }
+
+  function insertMindMap(source = null) {
+    const current = map();
+    if (!current) return;
+    const neighbors = window.mindMapGroups(current.nodes);
+    const anchor = neighbors[0][0];
+    const ids = new Map((source || []).map(item => [item.id, uid()]));
+    const added = source ? source.map(item => ({
+      ...item,
+      id: ids.get(item.id),
+      parent: item.parent === null ? null : ids.get(item.parent),
+      y: item.y + anchor.y - source[0].y,
+    })) : [{
+      id: uid(), parent: null, text: 'New mind map', x: anchor.x, y: anchor.y,
+      color: colorSlots[neighbors.length % colorSlots.length], shape: 'rounded', size: 18,
+    }];
+    if (current.nodes.length + added.length > 500) {
+      toast('This canvas can hold up to 500 ideas.');
+      return;
+    }
+    const byId = new Map(added.map(item => [item.id, item]));
+    const sizeForPlacement = item => {
+      if (!byId.has(item.id)) return dimensions(item);
+      const tier = item.parent === null ? 'root' : byId.get(item.parent)?.parent === null ? 'branch' : 'leaf';
+      return dimensions(item, tier);
+    };
+    if (!window.placeMindMap(added, neighbors, sizeForPlacement, true)) {
+      toast('There is no open space beside the maps on this canvas.');
+      return;
+    }
+    closeDialog();
+    setView(false);
+    applyChange(() => {
+      current.nodes.push(...added);
+      resetSelection(added[0].id);
+    });
+    fit(true);
+    if (!source) startEdit(added[0].id);
+    else toast('Mind map copied to this canvas');
+  }
+
+  function arrangeCanvasMindMap(nodeId) {
+    const groups = window.mindMapGroups(map().nodes);
+    const group = groups.find(items => items.some(item => item.id === nodeId));
+    if (!group) return;
+    window.arrangeMindMap(group, dimensions);
+    if (groups.length > 1) window.placeMindMap(group, groups.filter(items => items !== group), dimensions);
   }
   function nodeTier(n) {
     if (n.parent === null) return 'root';
@@ -302,7 +350,10 @@
     $('undoBtn').disabled = !history.length;
     $('redoBtn').disabled = !future.length;
     const count = map().nodes.length;
-    $('nodeCount').textContent = selection.size > 1 ? `${selection.size} of ${count} selected` : `${count} ${count === 1 ? 'idea' : 'ideas'}`;
+    const mapCount = map().nodes.filter(item => item.parent === null).length;
+    const totals = `${mapCount > 1 ? `${mapCount} maps · ` : ''}${count} ${count === 1 ? 'idea' : 'ideas'}`;
+    $('nodeCount').textContent = selection.size > 1 ? `${selection.size} of ${count} selected` : totals;
+    $('addMindMapBtn').disabled = count >= 500;
     if (!n) return;
     const style = appearance(n);
     $('selectedLabel').textContent = n.text;
@@ -325,7 +376,9 @@
     $('resetTextColor').disabled = !n.textColor;
     $('italicBtn').setAttribute('aria-pressed', String(style.italic));
     if(document.activeElement!==$('nodeNote')||$('nodeNote').dataset.node!==n.id){$('nodeNote').value=n.note||'';$('nodeNote').dataset.node=n.id;noteSession=null;}
-    $('deleteBtn').disabled=n.parent===null;$('duplicateBtn').disabled=n.parent===null;
+    $('deleteBtn').disabled = n.parent === null && mapCount === 1;
+    $('deleteBtn').querySelector('.delete-node-label').textContent = n.parent === null ? 'Remove mind map' : 'Delete node';
+    $('duplicateBtn').disabled = n.parent === null;
   }
   function render() {
     const current = map();
@@ -398,7 +451,7 @@
     const nodes = map()?.nodes;
     if (!nodes) return;
     if (nodes.length >= 500) {
-      toast('This map has 500 ideas. Start a new map to keep exploring.');
+      toast('This canvas can hold up to 500 ideas.');
       return;
     }
     const original = nodes.find(n => n.id === parentId) || root();
@@ -425,7 +478,7 @@
     applyChange(() => {
       const insertAt = sibling ? nodes.indexOf(original) + 1 : nodes.length;
       nodes.splice(insertAt, 0, added);
-      globalThis.arrangeMindMap(nodes, dimensions);
+      arrangeCanvasMindMap(added.id);
       resetSelection(added.id);
     });
     ensureVisible(added);
@@ -456,7 +509,16 @@
     const n = node();
     if (!n) return;
     if (n.parent === null) {
-      toast('Keep the central idea. You can edit its text.');
+      if (map().nodes.filter(item => item.parent === null).length === 1) {
+        toast('Keep the central idea. You can edit its text.');
+        return;
+      }
+      dialog('Remove this mind map?', `“${esc(n.text)}” and its branches will be removed from this canvas. You can undo this.`, `
+        <div class="map-removal-actions">
+          <button type="button" class="button secondary" data-close>Cancel</button>
+          <button type="button" class="button confirm-map-removal" data-remove-tree="${esc(n.id)}">Remove mind map</button>
+        </div>`);
+      $('dialogContent').querySelector('.map-removal-actions [data-close]').focus();
       return;
     }
     finishEdit();
@@ -468,11 +530,27 @@
     }
     applyChange(() => {
       map().nodes = map().nodes.filter(child => !removed.has(child.id));
-      globalThis.arrangeMindMap(map().nodes, dimensions);
+      arrangeCanvasMindMap(n.parent);
       resetSelection(n.parent);
     });
     ensureVisible(node());
     toast(`${removed.size === 1 ? 'Idea' : 'Branch'} deleted · Ctrl Z to undo`);
+  }
+
+  function removeMindMap(id) {
+    const current = map();
+    if (!current) return;
+    const groups = window.mindMapGroups(current.nodes);
+    const group = groups.find(items => items[0].id === id);
+    if (!group || groups.length <= 1) return;
+    closeDialog();
+    const removed = new Set(group.map(item => item.id));
+    applyChange(() => {
+      current.nodes = current.nodes.filter(item => !removed.has(item.id));
+      resetSelection();
+    });
+    fit(true);
+    toast('Mind map removed · Ctrl Z to undo');
   }
   function duplicate(){
     finishEdit();
@@ -480,13 +558,13 @@
     if (!n || n.parent === null) return;
     const nodes = map().nodes;
     if (nodes.length >= 500) {
-      toast('This map has reached 500 ideas.');
+      toast('This canvas can hold up to 500 ideas.');
       return;
     }
     const copy = { ...clone(n), id: uid(), text: `${n.text} copy`.slice(0, 120) };
     applyChange(() => {
       nodes.splice(nodes.indexOf(n) + 1, 0, copy);
-      globalThis.arrangeMindMap(nodes, dimensions);
+      arrangeCanvasMindMap(copy.id);
       resetSelection(copy.id);
     });
     ensureVisible(copy);
@@ -555,7 +633,7 @@
         const size = dimensions(other);
         return touches(after, other, size) && !touches(before, other, size);
       });
-      if (newlyOverlaps) window.arrangeMindMap(nodes, dimensions);
+      if (newlyOverlaps) arrangeCanvasMindMap(n.id);
     });
     ensureVisible(n);
   }
@@ -628,7 +706,10 @@
       } else if (drag.mode === 'move') {
         const elements = new Map([...$('nodes').children].map(el => [el.dataset.id, el]));
         drag.snapshot = clone(map());
-        drag.targets = map().nodes.filter(n => selection.has(n.id)).map(n => ({
+        const selectedNode = node();
+        const groups = selectedNode?.parent === null ? window.mindMapGroups(map().nodes) : [];
+        const moving = groups.length > 1 ? groups.find(items => items[0] === selectedNode) : map().nodes.filter(n => selection.has(n.id));
+        drag.targets = moving.map(n => ({
           node: n, element: elements.get(n.id), x: n.x, y: n.y, size: dimensions(n),
         }));
       }
@@ -679,7 +760,27 @@
   $('nodes').addEventListener('focusin',e=>{if(!gesture&&e.target.classList.contains('node'))select(e.target.dataset.id);});
   viewport.addEventListener('wheel',e=>{e.preventDefault();if(gesture)return;const r=viewport.getBoundingClientRect();zoom(Math.exp(-e.deltaY*.0015),{x:e.clientX-r.left,y:e.clientY-r.top});},{passive:false});
   function setPanel(value){panelOpen=value;document.body.classList.toggle('panel-hidden',!value);document.body.classList.toggle('panel-open',value);$('panelBtn').setAttribute('aria-pressed',String(value));if(!$('outlinePanel').hidden)renderOutline();}
-  function renderOutline(){const all=map().nodes, colors=palettes[map().palette].colors;function tree(parent){return `<ul>${all.filter(n=>n.parent===parent).map(n=>`<li><button data-outline="${esc(n.id)}"><span class="outline-dot" style="--dot:${colors[n.color].line}"></span>${esc(n.text)}</button>${tree(n.id)}</li>`).join('')}</ul>`;}const r=root();$('outlinePanel').innerHTML=`<h2>${esc(map().title)}</h2><div class="outline-tree"><button data-outline="${esc(r.id)}"><span class="outline-dot" style="--dot:${colors[r.color].rootBg}"></span><strong>${esc(r.text)}</strong></button>${tree(r.id)}</div>`;}
+  function renderOutline() {
+    const current = map();
+    const colors = palettes[current.palette].colors;
+    const children = new Map();
+    for (const item of current.nodes) {
+      if (!children.has(item.parent)) children.set(item.parent, []);
+      children.get(item.parent).push(item);
+    }
+    const itemButton = (item, isRoot = false) => {
+      const color = isRoot ? colors[item.color].rootBg : colors[item.color].line;
+      const label = isRoot ? `<strong>${esc(item.text)}</strong>` : esc(item.text);
+      return `<button data-outline="${esc(item.id)}"><span class="outline-dot" style="--dot:${color}"></span>${label}</button>`;
+    };
+    function tree(parent) {
+      const items = children.get(parent);
+      if (!items?.length) return '';
+      return `<ul>${items.map(item => `<li>${itemButton(item)}${tree(item.id)}</li>`).join('')}</ul>`;
+    }
+    const groups = (children.get(null) || []).map(item => `<div class="outline-mind-map">${itemButton(item, true)}${tree(item.id)}</div>`);
+    $('outlinePanel').innerHTML = `<h2>${esc(current.title)}</h2><div class="outline-tree">${groups.join('')}</div>`;
+  }
   function setView(outline){$('outlinePanel').hidden=!outline;$('mapViewBtn').classList.toggle('active',!outline);$('outlineViewBtn').classList.toggle('active',outline);if(outline)renderOutline();}
   $('outlinePanel').addEventListener('click',e=>{const target=e.target.closest('[data-outline]');if(target){const id=target.dataset.outline;select(id);setView(false);ensureVisible(node());startEdit(id);}});
   function dialog(title,sub,body){finishEdit();$('dialogContent').innerHTML=`<div class="dialog-head"><div><h2>${title}</h2>${sub?`<p>${sub}</p>`:''}</div><button class="icon-button" data-close aria-label="Close dialog">${icon('close')}</button></div><div class="dialog-body">${body}</div>`;if(!$('appDialog').open)$('appDialog').showModal();}
@@ -771,10 +872,39 @@
     $('undoBtn').disabled = false;
     $('redoBtn').disabled = true;
   }
+
+  function showAddMindMap() {
+    const current = map();
+    if (!current) return;
+    const room = 500 - current.nodes.length;
+    const sources = recentOrder(maps.filter(item => item.id !== current.id)).flatMap(item => (
+      window.mindMapGroups(item.nodes).map(group => {
+        const root = group[0];
+        const details = `${esc(item.title)} · ${group.length} ${group.length === 1 ? 'idea' : 'ideas'}`;
+        return `<button type="button" class="template-card" data-copy-canvas="${esc(item.id)}" data-copy-tree="${esc(root.id)}" ${group.length > room ? 'disabled' : ''}>
+          <span class="template-icon">${icon('map')}</span><span><strong>${esc(root.text)}</strong><small>${details}${group.length > room ? ' · Too many ideas to fit' : ''}</small></span>
+        </button>`;
+      })
+    ));
+    dialog('Add a mind map', 'Put another mind map alongside the ones on this canvas.', `
+      <button type="button" class="template-card" data-add-blank-map>
+        <span class="template-icon">${icon('plus')}</span><span><strong>Blank mind map</strong><small>Start with a new central idea.</small></span>
+      </button>
+      ${sources.length ? `<h3 class="mind-map-source-heading">Copy from another canvas</h3>${sources.join('')}` : ''}`);
+  }
+
   $('dialogContent').addEventListener('click', e => {
-    const target = e.target.closest('[data-open-map], [data-remove-map], [data-restore-map], [data-new-map]');
+    const target = e.target.closest('[data-open-map], [data-remove-map], [data-restore-map], [data-new-map], [data-add-blank-map], [data-copy-tree], [data-remove-tree]');
     if (!target) return;
-    if (target.hasAttribute('data-open-map')) {
+    if (target.hasAttribute('data-add-blank-map')) {
+      insertMindMap();
+    } else if (target.hasAttribute('data-copy-tree')) {
+      const source = maps.find(item => item.id === target.dataset.copyCanvas);
+      const group = source && window.mindMapGroups(source.nodes).find(items => items[0].id === target.dataset.copyTree);
+      if (group) insertMindMap(group);
+    } else if (target.hasAttribute('data-remove-tree')) {
+      removeMindMap(target.dataset.removeTree);
+    } else if (target.hasAttribute('data-open-map')) {
       closeDialog();
       switchMap(target.dataset.openMap);
     } else if (target.hasAttribute('data-new-map')) {
@@ -797,7 +927,7 @@
         </button>
         <button type="button" class="icon-button remove-map" data-remove-map="${esc(item.id)}" aria-label="Remove map: ${esc(item.title)}" title="Remove map">${icon('trash')}</button>
       </div>`).join('');
-    const empty = favorites ? '<div class="empty-state">Star a map to add it to Favorites.</div>' : `<div class="empty-state"><p>Your workspace has no mind maps.</p><button type="button" class="button primary" data-new-map>${icon('plus')}New mind map</button></div>`;
+    const empty = favorites ? '<div class="empty-state">Star a canvas to add it to Favorites.</div>' : `<div class="empty-state"><p>Your workspace has no canvases.</p><button type="button" class="button primary" data-new-map>${icon('plus')}New canvas</button></div>`;
     const feedback = notice ? `
       <div class="map-library-notice" id="mapLibraryNotice" tabindex="-1">
         <span role="status">${esc(notice)}</span>
@@ -848,6 +978,7 @@
   $('emptyNewMapBtn').onclick = makeMap;
   $('allMapsBtn').onclick = () => library();
   $('favoritesBtn').onclick = () => library(true);
+  $('addMindMapBtn').onclick = showAddMindMap;
   $('recentMaps').onclick = e => {
     const target = e.target.closest('[data-map], [data-remove-map]');
     if (!target) return;

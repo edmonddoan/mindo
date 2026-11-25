@@ -4,7 +4,9 @@ A lightweight mind map studio built with HTML, CSS, and JavaScript. Open `dist/i
 
 Maps are automatically saved in this browser's local storage. Features include editable and draggable ideas, colored branches, node styles, notes, undo/redo, zoom and pan, outline view, favorites, JSON import/export, SVG and PNG export, and editable snapshot links.
 
-Choose **New mind map** to start with a blank canvas. Hover over the canvas title to reveal the edit icon, then click the title to rename it. Press Enter to save or Escape to cancel. Click the star to add or remove the canvas from Favorites.
+Choose **New canvas** to start a page. On an open canvas, use **Add mind map** to start another map or copy one from another canvas. Each map has its own central idea and branches. When a canvas contains several maps, drag a central idea to move its whole map. Export and Share include every map on the canvas.
+
+Hover over the canvas title to reveal the edit icon, then click the title to rename it. Press Enter to save or Escape to cancel. Click the star to add or remove the canvas from Favorites.
 
 Adding or deleting an idea automatically spaces the branches around the central idea. Branches animate into place when you add an idea. Mindo respects your device's reduced motion setting. You can still drag ideas between changes, and Undo restores the previous ideas and their positions.
 

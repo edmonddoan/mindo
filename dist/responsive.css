@@ -54,6 +54,11 @@
 .sidebar { overflow: hidden auto; }
 .sidebar .brand { margin-bottom: 17px; }
 .sidebar .main-nav { margin-top: 18px; }
+.header-actions .add-mind-map { border-color: #b0c4b0; color: #315c48; }
+.header-actions .add-mind-map:hover { background: #edf3e9; }
+.delete-node-label { font: inherit; }
+.outline-mind-map + .outline-mind-map { border-top: 1px solid #e5eadf; margin-top: 12px; padding-top: 12px; }
+.mind-map-source-heading { font-size: 1rem; margin: 22px 0 9px; }
 
 @media (max-width: 720px) {
   .topbar,
@@ -72,6 +77,8 @@
   .header-actions :is(.share, .secondary) { min-height: 36px; }
   .header-actions .share { width: 36px; padding: 0; }
   .header-actions .share span { display: none; }
+  .header-actions .add-mind-map { width: 36px; padding: 0; }
+  .header-actions .add-mind-map span { display: none; }
 
   .canvas-top { left: 12px; right: 12px; top: 12px; }
   .canvas-top-right { min-width: 0; }

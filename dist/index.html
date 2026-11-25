@@ -18,6 +18,7 @@
     <symbol id="i-edit" viewBox="0 0 24 24"><path d="m4 16-1 5 5-1L20 8l-4-4ZM14 6l4 4"/></symbol>
     <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></symbol>
     <symbol id="i-map" viewBox="0 0 24 24"><rect x="3" y="9" width="6" height="6" rx="1.4"/><rect x="16" y="3" width="5" height="5" rx="1.2"/><rect x="16" y="16" width="5" height="5" rx="1.2"/><path d="M9 12h3V5.5h4M12 12v6.5h4"/></symbol>
+    <symbol id="i-map-add" viewBox="0 0 24 24"><rect x="3" y="9" width="6" height="6" rx="1.4"/><path d="M9 12h4m0 0V6h3m-3 6v6h3m3-4v8m-4-4h8"/><circle cx="18" cy="6" r="2"/></symbol>
     <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
     <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18a5 5 0 0 1-1-9.9 6 6 0 0 1 11.7-1A5.5 5.5 0 0 1 18 18"/><path d="m9 15 3 3 5-5"/></symbol>
@@ -42,7 +43,7 @@
   </defs></svg>
   <aside class="sidebar" id="sidebar">
     <a class="brand" href="#" aria-label="Mindo home"><img class="brand-mark" src="mindo-monogram.svg" alt="" width="36" height="36">mindo<span class="brand-dot">.</span></a>
-    <button class="button primary new-map" id="newMapBtn"><svg class="icon"><use href="#i-plus"/></svg>New mind map</button>
+    <button class="button primary new-map" id="newMapBtn"><svg class="icon"><use href="#i-plus"/></svg>New canvas</button>
     <nav class="main-nav" aria-label="Mind maps">
       <button class="nav-item active" id="allMapsBtn"><svg class="icon"><use href="#i-grid"/></svg>My mind maps<span id="mapCount">1</span></button>
       <button class="nav-item" id="favoritesBtn"><svg class="icon"><use href="#i-star"/></svg>Favorites</button>
@@ -71,14 +72,14 @@
           </div>
         </div>
       </div>
-      <div class="header-actions"><button class="icon-button" id="focusBtn" title="Focus mode" aria-label="Focus mode"><svg class="icon"><use href="#i-expand"/></svg></button><div class="export-wrap"><button class="button secondary" id="exportBtn" aria-label="Export map"><svg class="icon"><use href="#i-download"/></svg><span>Export</span><svg class="icon small"><use href="#i-chevron"/></svg></button><div class="dropdown" id="exportMenu" hidden><button data-export="svg">Vector image <span>SVG</span></button><button data-export="png">Image <span>PNG</span></button><button data-export="json">Editable mind map <span>JSON</span></button></div></div><button class="button share" id="shareBtn" aria-label="Share map"><svg class="icon"><use href="#i-share"/></svg><span>Share map</span></button></div>
+      <div class="header-actions"><button class="icon-button" id="focusBtn" title="Focus mode" aria-label="Focus mode"><svg class="icon"><use href="#i-expand"/></svg></button><button class="button secondary add-mind-map" id="addMindMapBtn" aria-label="Add mind map" title="Add a mind map to this canvas"><svg class="icon" aria-hidden="true"><use href="#i-map-add"/></svg><span>Add mind map</span></button><div class="export-wrap"><button class="button secondary" id="exportBtn" aria-label="Export canvas"><svg class="icon"><use href="#i-download"/></svg><span>Export</span><svg class="icon small"><use href="#i-chevron"/></svg></button><div class="dropdown" id="exportMenu" hidden><button data-export="svg">Vector image <span>SVG</span></button><button data-export="png">Image <span>PNG</span></button><button data-export="json">Editable canvas <span>JSON</span></button></div></div><button class="button share" id="shareBtn" aria-label="Share canvas"><svg class="icon"><use href="#i-share"/></svg><span>Share</span></button></div>
     </header>
     <section class="canvas-area" id="canvasArea" aria-label="Mind map workspace">
       <div class="workspace-empty-state" id="workspaceEmpty" hidden>
         <span class="empty-map-icon" aria-hidden="true"><svg class="icon"><use href="#i-map"/></svg></span>
         <h1>No mind maps yet</h1>
         <p>Start a map to organize your ideas.</p>
-        <button class="button primary" id="emptyNewMapBtn"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>New mind map</button>
+        <button class="button primary" id="emptyNewMapBtn"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>New canvas</button>
       </div>
       <div class="canvas-top">
         <div class="view-switch"><button class="active" id="mapViewBtn"><svg class="icon"><use href="#i-map"/></svg>Mind map</button><button id="outlineViewBtn"><svg class="icon"><use href="#i-list"/></svg>Outline</button></div>
@@ -121,7 +122,7 @@
           <div class="panel-divider"></div>
           <label class="field-label" for="nodeNote">Note <span>Optional</span></label>
           <textarea id="nodeNote" placeholder="Add a little context…" rows="3" maxlength="2000"></textarea>
-          <div class="node-actions"><button id="addChildBtn"><svg class="icon"><use href="#i-plus"/></svg>Add child<span>Tab</span></button><button id="duplicateBtn"><svg class="icon"><use href="#i-copy"/></svg>Duplicate<span>Ctrl D</span></button><button id="deleteBtn"><svg class="icon"><use href="#i-trash"/></svg>Delete node<span>Del</span></button></div>
+          <div class="node-actions"><button id="addChildBtn"><svg class="icon"><use href="#i-plus"/></svg>Add child<span>Tab</span></button><button id="duplicateBtn"><svg class="icon"><use href="#i-copy"/></svg>Duplicate<span>Ctrl D</span></button><button id="deleteBtn"><svg class="icon"><use href="#i-trash"/></svg><strong class="delete-node-label">Delete node</strong><span>Del</span></button></div>
         </div>
       </aside>
       <div class="canvas-bottom"><div class="map-meta"><svg class="icon"><use href="#i-map"/></svg><span id="nodeCount" aria-live="polite">13 ideas</span><span class="meta-divider"></span><span>Drag empty space to select</span></div><div class="zoom-controls"><button id="zoomOutBtn" title="Zoom out" aria-label="Zoom out"><svg class="icon"><use href="#i-minus"/></svg></button><button class="zoom-label" id="zoomLabel" title="Reset zoom">100%</button><button id="zoomInBtn" title="Zoom in" aria-label="Zoom in"><svg class="icon"><use href="#i-plus"/></svg></button><span></span><button id="fitBtn" title="Fit map to screen" aria-label="Fit map to screen"><svg class="icon"><use href="#i-fit"/></svg></button></div></div>
@@ -133,13 +134,13 @@
   <dialog id="removeMapDialog" aria-labelledby="removeMapHeading" aria-describedby="removeMapDescription">
     <div class="dialog-head">
       <div>
-        <h2 id="removeMapHeading">Remove this map?</h2>
-        <p id="removeMapDescription"><strong id="removeMapTitle"></strong> will move to Removed maps. You can restore it later.</p>
+        <h2 id="removeMapHeading">Remove this canvas?</h2>
+        <p id="removeMapDescription"><strong id="removeMapTitle"></strong> and all its mind maps will move to Removed maps. You can restore the canvas later.</p>
       </div>
     </div>
     <div class="dialog-body map-removal-actions">
       <button type="button" class="button secondary" id="cancelMapRemoval">Cancel</button>
-      <button type="button" class="button confirm-map-removal" id="confirmMapRemoval">Remove map</button>
+      <button type="button" class="button confirm-map-removal" id="confirmMapRemoval">Remove canvas</button>
     </div>
   </dialog>
   <div class="toast" id="toast">
