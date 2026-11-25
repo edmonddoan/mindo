@@ -9,59 +9,6 @@
     colorSlots, defaultPaletteId, defaultFontId, fontSizes, fonts, weights,
     palettes, paletteId, restoreNodeStyle, nodeStyle, validColor,
   } = window.MindoMapStyle;
-  const studyTemplates = {
-    recall: {
-      title: 'Active Recall', icon: 'spark', description: 'Test what you remember, then check what you missed.',
-      branches: [
-        ['Study targets', ['Core concepts', 'Key definitions', 'Worked examples']],
-        ['Recall questions', ['What is it?', 'How does it work?', 'When do I use it?']],
-        ['Check answers', ['Check my notes', 'Correct mistakes', 'Mark what felt hard']],
-        ['Try again', ['Retry from memory', 'Make flashcards', 'Set a review date']],
-      ],
-    },
-    explain: {
-      title: 'Explain It Simply', icon: 'map', description: 'Use the Feynman technique to find gaps in your understanding.',
-      branches: [
-        ['Choose a topic', ['Main concept', 'Why it matters', 'Where it appears']],
-        ['Explain it', ['Plain language', 'Simple example', 'Helpful analogy']],
-        ['Find gaps', ['Unclear steps', 'Terms I skipped', 'Questions to check']],
-        ['Revise', ['Review sources', 'Simplify again', 'Explain from memory']],
-      ],
-    },
-    review: {
-      title: 'Spaced Review', icon: 'template', description: 'Plan repeat practice and revisit the topics you find hardest.',
-      branches: [
-        ['Topics to review', ['Topic one', 'Topic two', 'Topic three']],
-        ['First review', ['Recall without notes', 'Check answers', 'Rate confidence']],
-        ['Later reviews', ['Tomorrow', 'In a few days', 'Next week']],
-        ['Adjust the plan', ['Review hard items', 'Space out easy ones', 'Set next dates']],
-      ],
-    },
-    session: {
-      title: 'Study Session', icon: 'key', description: 'Pick one goal, prepare your materials, and decide what comes next.',
-      branches: [
-        ['Set a goal', ['What will I learn?', 'One priority', 'What counts as done?']],
-        ['Get ready', ['Materials', 'Time available', 'Quiet workspace']],
-        ['Do the work', ['First small step', 'Practice task', 'Take a break']],
-        ['Wrap up', ['What I learned', 'What is still unclear?', 'Next session']],
-      ],
-    },
-  };
-
-  function sampleMap(kind = 'recall') {
-    const template = studyTemplates[kind] ?? studyTemplates.recall;
-    const map = { id: uid(), title: template.title, favorite: false, updated: Date.now(), palette: defaultPaletteId, nodes: [] };
-    const root = { id: 'root', parent: null, text: map.title, x: 560, y: 360, color: 'sage', shape: 'rounded', size: 18 };
-    map.nodes.push(root);
-    const branchPositions = [[325, 220, 'lavender'], [795, 220, 'peach'], [325, 500, 'yellow'], [795, 500, 'blue']];
-    template.branches.forEach(([text, children], index) => {
-      const id = `study-${index}`;
-      const [x, y, color] = branchPositions[index];
-      map.nodes.push({ id, parent: 'root', text, x, y, color, shape: 'rounded', size: 16 });
-      children.forEach((text, i) => map.nodes.push({ id: `${id}-${i}`, parent: id, text, x: x < 560 ? 100 : 1030, y: y + (i - 1) * 61, color, shape: 'rounded', size: 15 }));
-    });
-    return map;
-  }
   function validateMap(raw) {
     if (!raw || typeof raw.title !== 'string' || !Array.isArray(raw.nodes) || !raw.nodes.length || raw.nodes.length > 500) throw new Error('This is not a supported mind map.');
     const ids = new Set();
@@ -90,20 +37,17 @@
   const STORAGE = 'mindo.workspace.v1';
   let maps = [], currentId, selection = new Set(), history = [], future = [], tool = 'select', view = {x:0,y:0,scale:1}, editing = null, panelOpen = innerWidth >= 1400, spaceHeld = false, noteSession = null;
   let removedMaps = [];
-  let loadedWorkspace = false;
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE) || 'null');
     if (Array.isArray(saved?.maps)) {
       maps = saved.maps.map(validateMap);
       currentId = saved.currentId;
-      loadedWorkspace = true;
       for (const removed of Array.isArray(saved.removedMaps) ? saved.removedMaps : []) {
         try { removedMaps.push(validateMap(removed)); }
         catch { /* A malformed removed map must not affect active maps. */ }
       }
     }
   } catch { maps=[]; }
-  if (!loadedWorkspace) maps = [sampleMap()];
   currentId = maps.some(m => m.id === currentId) ? currentId : maps[0]?.id ?? null;
   const map = () => maps.find(m=>m.id===currentId);
   const root = () => map()?.nodes.find(n=>n.parent===null);
@@ -196,18 +140,16 @@
     if (!inLibrary) toast(`“${restored.title}” restored`);
     return restored;
   }
-  function makeMap(kind) {
+  function makeMap() {
     finishEdit();
-    const fresh = kind === 'blank' ? {
+    const fresh = {
       id: uid(), title: 'Untitled mind map', favorite: false, updated: Date.now(), palette: defaultPaletteId,
       nodes: [{ id: 'root', parent: null, text: 'Your big idea', x: 560, y: 360, color: 'sage', shape: 'rounded', size: 18 }],
-    } : sampleMap(kind);
+    };
     maps.unshift(fresh);
     closeDialog();
     switchMap(fresh.id);
-    if (kind === 'blank') setTimeout(() => {
-      if (currentId === fresh.id && !$('appDialog').open) startEdit(fresh.nodes[0].id);
-    }, 120);
+    startEdit(fresh.nodes[0].id);
   }
   function nodeTier(n) {
     if (n.parent === null) return 'root';
@@ -792,12 +734,6 @@
     }
   };
 
-  function templates() {
-    const choices = [['blank', { title: 'Blank Canvas', description: 'Start with one idea and build your own map.', icon: 'plus' }], ...Object.entries(studyTemplates)];
-    const cards = choices.map(([kind, template]) => `<button class="template-card" data-template="${kind}"><span class="template-icon">${icon(template.icon)}</span><span><strong>${template.title}</strong><small>${template.description}</small></span></button>`);
-    dialog('Study templates', 'Choose a way to study or start with a blank canvas.', cards.join(''));
-  }
-
   function renameCanvas() {
     const current = map();
     if (!current) return;
@@ -836,15 +772,13 @@
     $('redoBtn').disabled = true;
   }
   $('dialogContent').addEventListener('click', e => {
-    const target = e.target.closest('[data-template], [data-open-map], [data-remove-map], [data-restore-map], [data-new-map]');
+    const target = e.target.closest('[data-open-map], [data-remove-map], [data-restore-map], [data-new-map]');
     if (!target) return;
-    if (target.hasAttribute('data-template')) {
-      makeMap(target.dataset.template);
-    } else if (target.hasAttribute('data-open-map')) {
+    if (target.hasAttribute('data-open-map')) {
       closeDialog();
       switchMap(target.dataset.openMap);
     } else if (target.hasAttribute('data-new-map')) {
-      templates();
+      makeMap();
     } else if (target.hasAttribute('data-remove-map')) {
       requestMapRemoval(target);
     } else {
@@ -910,7 +844,10 @@
   async function importFile(file){try{const imported=validateMap(JSON.parse(await file.text()));imported.id=uid();imported.updated=Date.now();maps.unshift(imported);switchMap(imported.id);toast('Your mind map is ready');}catch(error){toast(error.message||'That file could not be opened. Try a Mindo JSON export.');}$('fileInput').value='';}
   $('fileInput').addEventListener('change',e=>{if(e.target.files[0])importFile(e.target.files[0]);});
   $('importBtn').onclick=()=>$('fileInput').click();
-  $('newMapBtn').onclick=templates;$('emptyNewMapBtn').onclick=templates;$('templatesBtn').onclick=templates;$('allMapsBtn').onclick=()=>library();$('favoritesBtn').onclick=()=>library(true);
+  $('newMapBtn').onclick = makeMap;
+  $('emptyNewMapBtn').onclick = makeMap;
+  $('allMapsBtn').onclick = () => library();
+  $('favoritesBtn').onclick = () => library(true);
   $('recentMaps').onclick = e => {
     const target = e.target.closest('[data-map], [data-remove-map]');
     if (!target) return;
@@ -919,8 +856,6 @@
   };
   document.querySelector('.brand').onclick=e=>{e.preventDefault();library();};
   $('favoriteBtn').onclick=()=>{map().favorite=!map().favorite;persist();renderSidebar();toast(map().favorite?'Added to favorites':'Removed from favorites');};
-  $('workspaceBtn').onclick=()=>dialog('Your personal workspace','A little space, just for you.',`<p>You have <strong>${maps.length} ${maps.length===1?'mind map':'mind maps'}</strong> and <strong>${maps.reduce((sum,m)=>sum+m.nodes.length,0)} ideas</strong> in this browser.</p><p>Maps save automatically on this device. Export an editable JSON file to keep a backup or move to another browser.</p>${map() ? `<button class="button secondary" id="workspaceExport">${icon('download')}Export current map</button>` : ''}`);
-  $('dialogContent').addEventListener('click',e=>{if(e.target.closest('#workspaceExport'))exportMap('json');});
   $('canvasTitleTrigger').onclick = renameCanvas;
   $('canvasName').addEventListener('blur', () => finishCanvasRename(true));
   $('canvasName').addEventListener('keydown', event => {

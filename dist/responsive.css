@@ -52,6 +52,8 @@
 .node.is-editing { z-index: 2; }
 #editNodeTool { display: none; }
 .sidebar { overflow: hidden auto; }
+.sidebar .brand { margin-bottom: 17px; }
+.sidebar .main-nav { margin-top: 18px; }
 
 @media (max-width: 720px) {
   .topbar,
@@ -65,7 +67,6 @@
   .heading { flex: 1 1 0; }
   .canvas-heading { flex: 1; }
   .title-row { gap: 3px; }
-  .breadcrumb { margin-bottom: 3px; white-space: nowrap; }
   .title-row .favorite-star { width: 34px; height: 36px; }
   .canvas-title-trigger { min-height: 36px; }
   .header-actions :is(.share, .secondary) { min-height: 36px; }
